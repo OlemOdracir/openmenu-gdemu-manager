@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openmenu-gdemu-manager"
+version = "0.1.0"
+description = "Local Windows manager for Dreamcast OpenMenu/GDEMU games and covers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+keywords = ["dreamcast", "gdemu", "openmenu", "desktop", "windows"]
+maintainers = [
+  { name = "OpenMenu GDEMU Manager", email = "openmenu.gdemu.manager@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Desktop Environment",
+]
+dependencies = [
+  "PySide6>=6.6",
+  "Pillow>=10.0",
+  "numpy>=1.26",
+]
+
+[project.gui-scripts]
+openmenu-gdemu-manager = "openmenu_gdemu_manager.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/OlemOdracir/openmenu-gdemu-manager"
+Repository = "https://github.com/OlemOdracir/openmenu-gdemu-manager"
+Issues = "https://github.com/OlemOdracir/openmenu-gdemu-manager/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+build = [
+  "pyinstaller>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+openmenu_gdemu_manager = ["resources/app/*.ico", "resources/app/*.png", "resources/i18n/*.json", "resources/icons/*.svg", "resources/illustrations/*.png", "resources/vendor/tabler/*.svg", "resources/vendor/tabler/LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

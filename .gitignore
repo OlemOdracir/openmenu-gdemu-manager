@@ -1,0 +1,42 @@
+# Ignore everything at the root of this folder (personal game library data)
+/*
+
+# Whitelist: project source code
+!src/
+!src/**
+!openmenu_gdemu_manager/
+!openmenu_gdemu_manager/__init__.py
+!openmenu_gdemu_manager/__main__.py
+!tests/
+!tests/**
+!Abrir_OpenMenu_GDEMU_Manager.vbs
+!Abrir_OpenMenu_GDEMU_Manager_DEBUG.bat
+!README.md
+!LICENSE
+!SECURITY.md
+!requirements.txt
+!pyproject.toml
+!THIRD_PARTY_NOTICES.md
+!docs/
+!docs/**
+!scripts/
+!scripts/**
+!.gitignore
+
+# Runtime data and generated files
+*.log
+cover_report.tsv
+cover_report.json
+cover_sources.json
+_cover_*/
+_cover_manager_state.json
+dist/
+build/
+*.spec
+
+# Python caches and test artifacts
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/

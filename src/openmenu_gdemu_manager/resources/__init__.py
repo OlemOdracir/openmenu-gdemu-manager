@@ -1,0 +1,1 @@
+"""Packaged reusable application resources."""
