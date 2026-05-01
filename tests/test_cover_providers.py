@@ -10,6 +10,7 @@ from openmenu_gdemu_manager.covers.providers.screenscraper import (
     screenscraper_candidates,
     test_connection,
 )
+from openmenu_gdemu_manager.covers.providers.registry import provider_definitions
 
 
 def test_local_provider_ignores_no_cover_placeholder(tmp_path: Path):
@@ -95,3 +96,14 @@ def test_screenscraper_query_variants_split_digit_letter_title_case():
 
     assert "18 Wheeler" in variants
     assert "18 Wheeler American Pro Trucker" in variants
+
+
+def test_registry_marks_unimplemented_remote_sources_as_coming_soon():
+    definitions = provider_definitions()
+
+    assert definitions["community_api"].find is not None
+    assert definitions["community_api"].configurable is False
+    assert definitions["screenscraper"].label == "ScreenScraper directo (avanzado)"
+    for provider_id in ("mobygames", "igdb", "rawg", "brave_image", "google_image"):
+        assert definitions[provider_id].coming_soon is True
+        assert definitions[provider_id].configurable is False

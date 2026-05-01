@@ -7,6 +7,7 @@ def test_old_settings_receive_cover_providers_defaults():
     merged = merge_settings(DEFAULT_SETTINGS, {"providers": {"local": False}})
 
     assert "cover_providers" in merged
+    assert merged["cover_providers"]["community_api"]["enabled"] is True
     assert merged["cover_providers"]["screenscraper"]["enabled"] is False
     assert merged["cover_providers"]["local"]["enabled"] is True
 

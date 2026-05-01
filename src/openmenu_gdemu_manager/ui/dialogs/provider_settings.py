@@ -45,7 +45,8 @@ class ProviderSettingsDialog(QDialog):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         intro = QLabel(
-            "Activa o desactiva fuentes de caratulas. Probar conexion no modifica juegos, estado ni SD."
+            "Activa fuentes de caratulas. La fuente recomendada no requiere cuenta; "
+            "las fuentes avanzadas pueden requerir credenciales propias."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -63,9 +64,12 @@ class ProviderSettingsDialog(QDialog):
         for row, (provider_id, definition) in enumerate(self.definitions.items()):
             self.rows[provider_id] = row
             cfg = self.settings.setdefault("cover_providers", {}).setdefault(provider_id, {})
+            if definition.coming_soon:
+                cfg["enabled"] = False
 
             enabled = QCheckBox()
             enabled.setChecked(bool(cfg.get("enabled", False)))
+            enabled.setEnabled(not definition.coming_soon)
             apply_interactive_cursor(enabled)
             enabled.stateChanged.connect(lambda _state, pid=provider_id: self._sync_row(pid))
             self.enabled_widgets[provider_id] = enabled
@@ -88,19 +92,21 @@ class ProviderSettingsDialog(QDialog):
 
             config_btn = QPushButton("Configurar")
             config_btn.setMinimumWidth(112)
+            config_btn.setEnabled(definition.configurable and not definition.coming_soon)
             apply_interactive_cursor(config_btn)
             config_btn.clicked.connect(lambda _=False, pid=provider_id: self._configure(pid))
             self.table.setCellWidget(row, 4, config_btn)
 
             test_btn = QPushButton("Probar")
             test_btn.setMinimumWidth(92)
+            test_btn.setEnabled(not definition.coming_soon)
             apply_interactive_cursor(test_btn)
             test_btn.clicked.connect(lambda _=False, pid=provider_id: self._test(pid))
             self.table.setCellWidget(row, 5, test_btn)
 
             signup_btn = QPushButton("Registrarse")
             signup_btn.setMinimumWidth(112)
-            signup_btn.setEnabled(bool(definition.signup_url))
+            signup_btn.setEnabled(bool(definition.signup_url) and not definition.coming_soon)
             apply_interactive_cursor(signup_btn)
             signup_btn.clicked.connect(lambda _=False, pid=provider_id: self._signup(pid))
             self.table.setCellWidget(row, 6, signup_btn)
@@ -145,6 +151,8 @@ class ProviderSettingsDialog(QDialog):
         cfg = self.settings.get("cover_providers", {}).get(provider_id, {})
         definition = self.definitions[provider_id]
         if not cfg.get("enabled", False):
+            if definition.coming_soon:
+                return "proximamente"
             return "apagado"
         if definition.find is None:
             return "reservado"

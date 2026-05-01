@@ -78,7 +78,9 @@ That folder is intentionally not included in the public repository. Only use fil
 
 ## Cover Sources
 
-Default safe sources are local folders, openMenu image DB data, and Libretro thumbnails. Optional providers such as ScreenScraper require user credentials configured locally.
+Default safe sources are local folders, openMenu image DB data, Libretro thumbnails, and the OpenMenu Cover API proxy. The proxy does not require user accounts and does not expose third-party developer credentials to the desktop app.
+
+Advanced direct providers such as ScreenScraper can be configured locally by users who want to use their own credentials. Other API providers are reserved for future versions.
 
 Manual Google/Bing/DuckDuckGo image searches open in the browser. The app does not scrape those sites automatically.
 

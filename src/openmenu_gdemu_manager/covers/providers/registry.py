@@ -23,6 +23,8 @@ class ProviderDefinition:
     find: FindCallback | None = None
     test: TestCallback | None = None
     remote: bool = True
+    configurable: bool = True
+    coming_soon: bool = False
 
 
 def _local_find(game: GameItem, query: str, settings: dict[str, Any]) -> list[Candidate]:
@@ -54,18 +56,20 @@ def _not_implemented(label: str) -> TestCallback:
 
 
 def _definitions() -> dict[str, ProviderDefinition]:
+    from .community_api import community_api_candidates, test_connection as test_community_api
     from .screenscraper import screenscraper_candidates, test_connection as test_screenscraper
 
     return {
         "local": ProviderDefinition("local", "Carpetas locales", False, "", _local_find, _local_test, remote=False),
         "openmenu": ProviderDefinition("openmenu", "openMenu image DB", False, "https://github.com/mrneo240/openMenu_imagedb", _openmenu_find, _remote_test("openMenu")),
         "libretro": ProviderDefinition("libretro", "Libretro thumbnails", False, "https://github.com/libretro-thumbnails/Sega_-_Dreamcast", _libretro_find, _remote_test("Libretro")),
-        "screenscraper": ProviderDefinition("screenscraper", "ScreenScraper", True, "https://www.screenscraper.fr/", screenscraper_candidates, test_screenscraper),
-        "mobygames": ProviderDefinition("mobygames", "MobyGames", True, "https://www.mobygames.com/api/subscribe/", None, _not_implemented("MobyGames")),
-        "igdb": ProviderDefinition("igdb", "IGDB", True, "https://api-docs.igdb.com/#getting-started", None, _not_implemented("IGDB")),
-        "rawg": ProviderDefinition("rawg", "RAWG", True, "https://rawg.io/apidocs", None, _not_implemented("RAWG")),
-        "brave_image": ProviderDefinition("brave_image", "Brave Image Search", True, "https://brave.com/search/api/", None, _not_implemented("Brave Image Search")),
-        "google_image": ProviderDefinition("google_image", "Google Custom Search", True, "https://developers.google.com/custom-search/v1/overview", None, _not_implemented("Google Custom Search")),
+        "community_api": ProviderDefinition("community_api", "OpenMenu Cover API", False, "", community_api_candidates, test_community_api, configurable=False),
+        "screenscraper": ProviderDefinition("screenscraper", "ScreenScraper directo (avanzado)", True, "https://www.screenscraper.fr/", screenscraper_candidates, test_screenscraper),
+        "mobygames": ProviderDefinition("mobygames", "MobyGames (proximamente)", True, "", None, _not_implemented("MobyGames"), configurable=False, coming_soon=True),
+        "igdb": ProviderDefinition("igdb", "IGDB (proximamente)", True, "", None, _not_implemented("IGDB"), configurable=False, coming_soon=True),
+        "rawg": ProviderDefinition("rawg", "RAWG (proximamente)", True, "", None, _not_implemented("RAWG"), configurable=False, coming_soon=True),
+        "brave_image": ProviderDefinition("brave_image", "Brave Image Search (proximamente)", True, "", None, _not_implemented("Brave Image Search"), configurable=False, coming_soon=True),
+        "google_image": ProviderDefinition("google_image", "Google Custom Search (proximamente)", True, "", None, _not_implemented("Google Custom Search"), configurable=False, coming_soon=True),
     }
 
 

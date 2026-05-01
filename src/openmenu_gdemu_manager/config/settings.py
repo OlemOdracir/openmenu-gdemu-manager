@@ -32,6 +32,14 @@ DEFAULT_SETTINGS: dict[str, Any] = {
             "min_auto_score": 86,
             "min_review_score": 65,
         },
+        "community_api": {
+            "enabled": True,
+            "base_url": "https://openmenu-gdemu-cover-api.openmenu-gdemu-manager.workers.dev",
+            "timeout": 20,
+            "priority": 35,
+            "min_auto_score": 86,
+            "min_review_score": 65,
+        },
         "screenscraper": {
             "enabled": False,
             "base_url": "https://api.screenscraper.fr/api2",
