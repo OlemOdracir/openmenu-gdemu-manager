@@ -17,7 +17,7 @@ The script creates:
 - `dist/OpenMenuGDEMUManager-Portable/`
 - `dist/OpenMenuGDEMUManager-<version>-portable-windows.zip`
 
-Users should launch `Run-Portable.cmd`. That wrapper keeps settings, logs, cache, cover inbox and backups inside the portable folder instead of `%LOCALAPPDATA%`.
+Users should launch `OpenMenuGDEMUManager.exe`. The portable executable keeps settings, logs, cache, cover inbox and backups inside the portable folder instead of `%LOCALAPPDATA%`.
 
 ## Updates
 

@@ -37,17 +37,11 @@ py -m PyInstaller `
 Move-Item -LiteralPath (Join-Path $DistRoot $Name) -Destination $PortableRoot
 
 @"
-@echo off
-set "OPENMENU_GDEMU_MANAGER_HOME=%~dp0data"
-set "OPENMENU_GDEMU_MANAGER_DOCUMENTS=%~dp0data\Documents"
-start "" "%~dp0$Name.exe"
-"@ | Set-Content -Path (Join-Path $PortableRoot "Run-Portable.cmd") -Encoding ASCII
-
-@"
 OpenMenu GDEMU Manager Portable
 Version: $Version
 
-Run Run-Portable.cmd to keep settings, logs and cache inside this folder.
+Run OpenMenuGDEMUManager.exe to start the app.
+Settings, logs, cache and generated files are kept inside the data folder next to the executable.
 The app checks GitHub releases on startup and opens the release page when an update is available.
 "@ | Set-Content -Path (Join-Path $PortableRoot "README-PORTABLE.txt") -Encoding UTF8
 

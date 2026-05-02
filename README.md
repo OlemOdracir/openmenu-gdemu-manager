@@ -45,7 +45,7 @@ The output is written to `dist/`:
 - `OpenMenuGDEMUManager-Portable/`
 - `OpenMenuGDEMUManager-0.1.0-portable-windows.zip`
 
-Portable users should run `Run-Portable.cmd`. That wrapper keeps settings, logs, cache and generated files inside the portable folder.
+Portable users should run `OpenMenuGDEMUManager.exe`. The executable keeps settings, logs, cache and generated files inside the portable folder.
 
 ## Updates
 
@@ -86,7 +86,7 @@ Manual Google/Bing/DuckDuckGo image searches open in the browser. The app does n
 
 ## Runtime Data
 
-Runtime data is kept outside the repo by default, under the app data directory, or inside the portable folder when using `Run-Portable.cmd`.
+Runtime data is kept outside the repo by default, under the app data directory, or inside the portable folder when using the portable executable.
 
 Common generated files include:
 
