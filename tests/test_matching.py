@@ -1,4 +1,4 @@
-from openmenu_gdemu_manager.core.matching import normalize, normalize_product, safe_filename
+from openmenu_gdemu_manager.core.matching import has_conflicting_numbers, normalize, normalize_product, safe_filename
 
 
 def test_normalize_removes_noise():
@@ -11,3 +11,8 @@ def test_normalize_product_keeps_alnum_uppercase():
 
 def test_safe_filename_includes_slot_and_png_suffix():
     assert safe_filename(7, "Crazy Taxi!") == "007_Crazy_Taxi.png"
+
+
+def test_conflicting_numbers_allow_year_subtitles_but_block_sequels():
+    assert not has_conflicting_numbers("Capcom vs. SNK", "Capcom vs. SNK Millennium Fight 2000")
+    assert has_conflicting_numbers("Capcom vs. SNK", "Capcom vs. SNK 2 Millionaire Fighting 2001")

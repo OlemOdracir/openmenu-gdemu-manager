@@ -78,13 +78,20 @@ def has_conflicting_numbers(query: str, title: str) -> bool:
     q_tokens = set(nq.split())
     t_tokens = set(nt.split())
     q_numbers = {tok for tok in q_tokens if tok.isdigit()}
-    t_numbers = {tok for tok in t_tokens if tok.isdigit()}
+    t_numbers = {tok for tok in t_tokens if tok.isdigit() and not _is_year_token(tok)}
     if q_numbers and t_numbers:
         return q_numbers != t_numbers
     if not q_numbers and t_numbers:
         shared = q_tokens & t_tokens
         return len(shared) >= max(1, min(2, len(q_tokens)))
     return False
+
+
+def _is_year_token(token: str) -> bool:
+    if not token.isdigit() or len(token) != 4:
+        return False
+    value = int(token)
+    return 1970 <= value <= 2099
 
 
 def normalize_product(product_id: str) -> str:
