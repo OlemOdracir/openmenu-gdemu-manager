@@ -1,7 +1,9 @@
 import json
+from pathlib import Path
 
 import pytest
 
+from openmenu_gdemu_manager.services import backup_service
 from openmenu_gdemu_manager.services.backup_service import BackupError, backup_sd_contents, suggested_backup_dir
 
 
@@ -49,3 +51,13 @@ def test_suggested_backup_dir_uses_base_dir(tmp_path):
 
     assert suggestion.parent == tmp_path / "Backups"
     assert suggestion.name.startswith("SD_")
+
+
+def test_suggested_backup_dir_defaults_to_user_documents_on_windows(tmp_path, monkeypatch):
+    monkeypatch.setattr(backup_service.os, "name", "nt")
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "User"))
+
+    suggestion = suggested_backup_dir(Path("H:/"))
+
+    assert suggestion.parent == tmp_path / "User" / "Documents" / "OpenMenu GDEMU Manager" / "Backups"
+    assert suggestion.name.startswith("SD_H_")

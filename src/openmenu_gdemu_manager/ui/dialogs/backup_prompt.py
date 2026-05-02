@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -17,7 +18,6 @@ from PySide6.QtWidgets import (
 )
 
 from ... import APP_NAME
-from ...config.paths import BACKUPS_DIR
 from ...config.settings import load_settings, save_settings
 from ...dreamcast.storage_diagnostics import StorageDiagnostic
 from ...i18n import tr
@@ -65,7 +65,7 @@ class BackupPromptDialog(QDialog):
         self.diagnostic = diagnostic
         self.force = force
         self.settings = load_settings()
-        self.destination = suggested_backup_dir(diagnostic.root, BACKUPS_DIR)
+        self.destination = suggested_backup_dir(diagnostic.root)
         self.backup_thread: QThread | None = None
         self.backup_worker: BackupWorker | None = None
         self.setWindowTitle(tr("dialog.backup.title"))
@@ -107,25 +107,33 @@ class BackupPromptDialog(QDialog):
         hero_row.addLayout(text, 1)
         layout.addWidget(hero)
 
-        source_row, _source_value = _path_row(
+        paths = QGridLayout()
+        paths.setContentsMargins(0, 4, 0, 4)
+        paths.setHorizontalSpacing(8)
+        paths.setVerticalSpacing(14)
+        paths.setColumnMinimumWidth(0, 34)
+        paths.setColumnMinimumWidth(1, 170)
+        paths.setColumnStretch(2, 1)
+
+        _add_path_row(
+            paths,
+            0,
             sd_card_qicon(26).pixmap(QSize(26, 26)),
             tr("dialog.backup.source_label"),
             str(self.diagnostic.root),
         )
-        layout.addLayout(source_row)
 
-        destination_row, self.destination_label = _path_row(
+        self.destination_label = _add_path_row(
+            paths,
+            1,
             illustration_pixmap("drive_device", 26),
             tr("dialog.backup.destination_label"),
             str(self.destination),
         )
-        layout.addLayout(destination_row)
+        layout.addLayout(paths)
         self._refresh_destination()
 
-        warning = QLabel(
-            "Recomendacion: crea el respaldo en el disco duro, no dentro de la SD. "
-            "Si continuas sin respaldo, la app recordara esta decisión para esta estructura."
-        )
+        warning = QLabel(tr("dialog.backup.warning"))
         warning.setObjectName("ChipWarning")
         warning.setWordWrap(True)
         layout.addWidget(warning)
@@ -167,7 +175,7 @@ class BackupPromptDialog(QDialog):
         if not folder:
             return
         selected = Path(folder)
-        default_name = suggested_backup_dir(self.diagnostic.root, BACKUPS_DIR).name
+        default_name = suggested_backup_dir(self.diagnostic.root).name
         self.destination = selected if selected.name.lower() == default_name.lower() else selected / default_name
         self._refresh_destination()
         if self.destination.exists() and any(self.destination.iterdir()):
@@ -262,25 +270,23 @@ def _button(text: str, icon_name: str, variant: str) -> QPushButton:
     return button
 
 
-def _path_row(icon_pixmap, label_text: str, value_text: str) -> tuple[QHBoxLayout, QLabel]:
-    row = QHBoxLayout()
-    row.setSpacing(8)
-
+def _add_path_row(grid: QGridLayout, row: int, icon_pixmap, label_text: str, value_text: str) -> QLabel:
     icon = QLabel()
     icon.setFixedSize(28, 28)
     icon.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
     icon.setPixmap(icon_pixmap)
     icon.setStyleSheet("background: transparent;")
-    row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+    grid.addWidget(icon, row, 0, Qt.AlignmentFlag.AlignTop)
 
     label = QLabel(label_text)
     label.setObjectName("PathLabel")
-    label.setMinimumWidth(120)
+    label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
     label.setStyleSheet("background: transparent; font-weight: 800;")
-    row.addWidget(label, 0, Qt.AlignmentFlag.AlignTop)
+    grid.addWidget(label, row, 1, Qt.AlignmentFlag.AlignTop)
 
     value = QLabel(value_text)
     value.setObjectName("StatusMessage")
     value.setWordWrap(True)
-    row.addWidget(value, 1)
-    return row, value
+    value.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+    grid.addWidget(value, row, 2)
+    return value

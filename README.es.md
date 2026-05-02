@@ -1,8 +1,12 @@
-# OpenMenu GDEMU Manager
+<p align="center">
+  <img src="docs/screenshots/ogm-logo.png" alt="Logo de OpenMenu GDEMU Manager" width="120">
+</p>
+
+# OpenMenu GDEMU Manager (OGM)
 
 [English](README.md)
 
-Aplicacion de escritorio para Windows para preparar y administrar tarjetas SD o respaldos locales de Dreamcast GDEMU/OpenMenu.
+Aplicacion portable para Windows para preparar y administrar tarjetas SD o respaldos locales de Dreamcast GDEMU/OpenMenu.
 
 La app permite revisar una estructura GDEMU/OpenMenu, organizar juegos, buscar caratulas, preparar cambios y aplicar escritura solo cuando el diagnostico de seguridad lo permite.
 
@@ -28,7 +32,13 @@ Esta beta no esta firmada digitalmente. Windows SmartScreen puede mostrar una ad
 
 ## Capturas
 
-Las capturas se agregaran antes del anuncio publico de la beta.
+### Ventana principal
+
+![Ventana principal de OpenMenu GDEMU Manager](docs/screenshots/main-window.png)
+
+### Fuentes online de caratulas
+
+![Configuracion de fuentes online de caratulas](docs/screenshots/online-sources.png)
 
 ## Funciones
 

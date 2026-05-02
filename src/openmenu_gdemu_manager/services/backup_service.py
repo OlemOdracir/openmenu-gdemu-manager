@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import hashlib
 from datetime import datetime
@@ -18,11 +19,20 @@ class BackupError(RuntimeError):
 ProgressCallback = Callable[[int, int, str], None]
 
 
-def suggested_backup_dir(source: Path, base_dir: Path = BACKUPS_DIR) -> Path:
+def suggested_backup_dir(source: Path, base_dir: Path | None = None) -> Path:
     source = Path(source)
+    base_dir = base_dir or _default_backup_base_dir()
     drive = source.drive.rstrip(":\\") or "folder"
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return base_dir / f"SD_{drive}_{stamp}"
+
+
+def _default_backup_base_dir() -> Path:
+    if os.name == "nt":
+        user_profile = os.environ.get("USERPROFILE", "").strip()
+        if user_profile:
+            return Path(user_profile) / "Documents" / "OpenMenu GDEMU Manager" / "Backups"
+    return BACKUPS_DIR
 
 
 def backup_sd_contents(source: Path, destination: Path, progress: ProgressCallback | None = None) -> Path:

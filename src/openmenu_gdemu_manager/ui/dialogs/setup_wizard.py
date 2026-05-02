@@ -41,7 +41,6 @@ from ...core.placeholder import ensure_no_cover_asset
 from ...dreamcast.rom_library import inspect_source, scan_rom_library
 from ...covers.search import load_candidate_image
 from ...config.settings import load_settings, save_settings, web_search_templates
-from ...config.paths import BACKUPS_DIR
 from ...dreamcast.storage_diagnostics import StorageDiagnostic, diagnose_storage
 from ...i18n import tr
 from ...services.backup_service import (
@@ -509,7 +508,7 @@ class SetupWizardDialog(QDialog):
             self.run_diagnostic()
         if self.diagnostic is None:
             return
-        default_target = suggested_backup_dir(self.diagnostic.root, BACKUPS_DIR)
+        default_target = suggested_backup_dir(self.diagnostic.root)
         folder = QFileDialog.getExistingDirectory(
             self,
             "Seleccionar carpeta para respaldo",
