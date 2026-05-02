@@ -3,6 +3,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+  $PSNativeCommandUseErrorActionPreference = $true
+}
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
@@ -48,5 +51,12 @@ Run Run-Portable.cmd to keep settings, logs and cache inside this folder.
 The app checks GitHub releases on startup and opens the release page when an update is available.
 "@ | Set-Content -Path (Join-Path $PortableRoot "README-PORTABLE.txt") -Encoding UTF8
 
-Compress-Archive -Path (Join-Path $PortableRoot "*") -DestinationPath (Join-Path $DistRoot "$Name-$Version-portable-windows.zip") -Force
+Copy-Item -LiteralPath (Join-Path $Root "LICENSE") -Destination (Join-Path $PortableRoot "LICENSE.txt") -Force
+Copy-Item -LiteralPath (Join-Path $Root "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $PortableRoot "THIRD_PARTY_NOTICES.md") -Force
+
+$ZipPath = Join-Path $DistRoot "$Name-$Version-portable-windows.zip"
+Compress-Archive -Path (Join-Path $PortableRoot "*") -DestinationPath $ZipPath -Force
+Get-FileHash $ZipPath -Algorithm SHA256 |
+  ForEach-Object { "$($_.Hash)  $(Split-Path -Leaf $ZipPath)" } |
+  Set-Content -Path "$ZipPath.sha256.txt" -Encoding ASCII
 Write-Host "Portable package created in dist."
