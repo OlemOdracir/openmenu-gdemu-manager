@@ -27,7 +27,7 @@ from ...services.backup_service import (
     set_backup_decision,
     suggested_backup_dir,
 )
-from ..icons import illustration_pixmap, vendor_qicon
+from ..icons import illustration_pixmap, sd_card_qicon, vendor_qicon
 
 log = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ class BackupPromptDialog(QDialog):
         self.backup_thread: QThread | None = None
         self.backup_worker: BackupWorker | None = None
         self.setWindowTitle(tr("dialog.backup.title"))
-        self.resize(760, 420)
-        self.setMinimumSize(720, 400)
+        self.resize(840, 500)
+        self.setMinimumSize(780, 460)
         self._build_ui()
 
     def _build_ui(self):
@@ -80,15 +80,16 @@ class BackupPromptDialog(QDialog):
 
         hero = QWidget()
         hero.setObjectName("WizardHero")
-        hero.setMinimumHeight(132)
+        hero.setMinimumHeight(170)
         hero_row = QHBoxLayout(hero)
-        hero_row.setContentsMargins(20, 18, 20, 18)
-        hero_row.setSpacing(18)
+        hero_row.setContentsMargins(24, 22, 24, 22)
+        hero_row.setSpacing(24)
         icon = QLabel()
-        icon.setFixedSize(64, 64)
-        icon.setPixmap(illustration_pixmap("sd_cards", 64))
+        icon.setFixedSize(150, 126)
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setPixmap(illustration_pixmap("backup_sd_to_hdd", 126))
         icon.setStyleSheet("background: transparent;")
-        hero_row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+        hero_row.addWidget(icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         text = QVBoxLayout()
         text.setSpacing(8)
@@ -106,15 +107,19 @@ class BackupPromptDialog(QDialog):
         hero_row.addLayout(text, 1)
         layout.addWidget(hero)
 
-        source = QLabel(tr("dialog.backup.source", path=self.diagnostic.root))
-        source.setObjectName("MutedLabel")
-        source.setWordWrap(True)
-        layout.addWidget(source)
+        source_row, _source_value = _path_row(
+            sd_card_qicon(26).pixmap(QSize(26, 26)),
+            tr("dialog.backup.source_label"),
+            str(self.diagnostic.root),
+        )
+        layout.addLayout(source_row)
 
-        self.destination_label = QLabel("")
-        self.destination_label.setObjectName("StatusMessage")
-        self.destination_label.setWordWrap(True)
-        layout.addWidget(self.destination_label)
+        destination_row, self.destination_label = _path_row(
+            illustration_pixmap("drive_device", 26),
+            tr("dialog.backup.destination_label"),
+            str(self.destination),
+        )
+        layout.addLayout(destination_row)
         self._refresh_destination()
 
         warning = QLabel(
@@ -151,7 +156,7 @@ class BackupPromptDialog(QDialog):
         layout.addLayout(buttons)
 
     def _refresh_destination(self):
-        self.destination_label.setText(tr("dialog.backup.destination", path=self.destination))
+        self.destination_label.setText(str(self.destination))
 
     def choose_destination(self):
         folder = QFileDialog.getExistingDirectory(
@@ -255,3 +260,27 @@ def _button(text: str, icon_name: str, variant: str) -> QPushButton:
     button.setProperty("variant", variant)
     button.setCursor(Qt.CursorShape.PointingHandCursor)
     return button
+
+
+def _path_row(icon_pixmap, label_text: str, value_text: str) -> tuple[QHBoxLayout, QLabel]:
+    row = QHBoxLayout()
+    row.setSpacing(8)
+
+    icon = QLabel()
+    icon.setFixedSize(28, 28)
+    icon.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+    icon.setPixmap(icon_pixmap)
+    icon.setStyleSheet("background: transparent;")
+    row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+
+    label = QLabel(label_text)
+    label.setObjectName("PathLabel")
+    label.setMinimumWidth(120)
+    label.setStyleSheet("background: transparent; font-weight: 800;")
+    row.addWidget(label, 0, Qt.AlignmentFlag.AlignTop)
+
+    value = QLabel(value_text)
+    value.setObjectName("StatusMessage")
+    value.setWordWrap(True)
+    row.addWidget(value, 1)
+    return row, value

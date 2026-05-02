@@ -1,6 +1,7 @@
 import json
 import zipfile
 from pathlib import Path
+from importlib.resources import files
 
 from PIL import Image
 import pytest
@@ -69,3 +70,9 @@ def test_registry_falls_back_to_internal_template(tmp_path):
 
     assert registry.normalize("does_not_exist") == "arcade_clean"
     assert registry.get("does_not_exist").id == "arcade_clean"
+
+
+def test_backup_prompt_illustration_is_packaged():
+    path = files("openmenu_gdemu_manager.resources.illustrations").joinpath("backup_sd_to_hdd_512.png")
+
+    assert path.is_file()
