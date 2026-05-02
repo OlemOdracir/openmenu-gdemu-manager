@@ -49,7 +49,18 @@ Copy-Item -LiteralPath (Join-Path $Root "LICENSE") -Destination (Join-Path $Port
 Copy-Item -LiteralPath (Join-Path $Root "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $PortableRoot "THIRD_PARTY_NOTICES.md") -Force
 
 $ZipPath = Join-Path $DistRoot "$Name-$Version-portable-windows.zip"
-Compress-Archive -Path (Join-Path $PortableRoot "*") -DestinationPath $ZipPath -Force
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+  try {
+    Compress-Archive -Path (Join-Path $PortableRoot "*") -DestinationPath $ZipPath -Force -ErrorAction Stop
+    break
+  }
+  catch {
+    if ($attempt -eq 3) {
+      throw
+    }
+    Start-Sleep -Seconds 2
+  }
+}
 Get-FileHash $ZipPath -Algorithm SHA256 |
   ForEach-Object { "$($_.Hash)  $(Split-Path -Leaf $ZipPath)" } |
   Set-Content -Path "$ZipPath.sha256.txt" -Encoding ASCII

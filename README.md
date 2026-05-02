@@ -1,5 +1,7 @@
 # OpenMenu GDEMU Manager
 
+[Español](README.es.md)
+
 Windows desktop app for preparing and managing Dreamcast GDEMU/OpenMenu SD cards and local backups.
 
 The app can scan a GDEMU/OpenMenu structure, stage cover art, add or remove games, and apply changes only after a safety diagnostic allows writing.
@@ -9,6 +11,18 @@ The app can scan a GDEMU/OpenMenu structure, stage cover art, add or remove game
 Early public beta. Use it with backups and review the diagnostic before applying changes to an SD card.
 
 This repository does not include ROMs, BIOS files, commercial game data, SD backups, official Sega assets, or private API credentials.
+
+## Download
+
+Download the latest portable Windows ZIP from [GitHub Releases](https://github.com/OlemOdracir/openmenu-gdemu-manager/releases).
+
+Extract the ZIP and run `OpenMenuGDEMUManager.exe`. The app stores settings, logs, cache and generated files in the portable `data/` folder next to the executable.
+
+This beta is not digitally signed. Windows SmartScreen may show a warning the first time it is opened.
+
+## Screenshots
+
+Screenshots will be added before the public beta announcement.
 
 ## License
 

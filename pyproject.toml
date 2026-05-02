@@ -54,3 +54,6 @@ openmenu_gdemu_manager = ["resources/app/*.ico", "resources/app/*.png", "resourc
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "integration: tests that call public network services and are skipped by default unless explicitly enabled",
+]

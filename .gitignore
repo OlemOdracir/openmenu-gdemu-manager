@@ -12,6 +12,8 @@
 !Abrir_OpenMenu_GDEMU_Manager.vbs
 !Abrir_OpenMenu_GDEMU_Manager_DEBUG.bat
 !README.md
+!README.es.md
+!CONTRIBUTING.md
 !LICENSE
 !SECURITY.md
 !requirements.txt
@@ -21,6 +23,8 @@
 !docs/**
 !scripts/
 !scripts/**
+!.github/
+!.github/**
 !.gitignore
 
 # Runtime data and generated files
