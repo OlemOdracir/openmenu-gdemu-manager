@@ -153,11 +153,21 @@ def _progressive_results(candidates: list[Candidate], limit: int, settings: dict
     def review_threshold(candidate: Candidate) -> int:
         return provider_threshold(settings, source_provider_id(candidate.source), "min_review_score", 65)
 
-    strong = [c for c in candidates if c.product_match or c.alias_match or c.score >= review_threshold(c)]
+    strong = [
+        c
+        for c in candidates
+        if _has_acceptable_preview_quality(c) and (c.product_match or c.alias_match or c.score >= review_threshold(c))
+    ]
     if len(strong) >= 6:
         return strong[:limit]
     if settings.get("show_weak_candidates", False):
         weak = [c for c in candidates if c not in strong]
         return [*strong, *weak][:limit]
     return strong[:limit]
+
+
+def _has_acceptable_preview_quality(candidate: Candidate) -> bool:
+    if not candidate.quality_score:
+        return True
+    return candidate.quality_score >= 50
 

@@ -92,3 +92,30 @@ def test_conflicting_sequence_candidate_is_filtered(monkeypatch):
     )
 
     assert candidates == []
+
+
+def test_low_quality_remote_preview_is_not_strong_by_default(monkeypatch):
+    settings = {
+        "cover_providers": {
+            "community_api": {"enabled": False, "priority": 10, "min_review_score": 65},
+        },
+        "allow_remote_downloads": True,
+        "candidate_limit": 60,
+        "dedupe_preload_limit": 90,
+    }
+    low_quality = Candidate("community_api/screenscraper", "Capcom vs. SNK Millennium Collection", 80)
+    low_quality.quality_score = 33
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
+    monkeypatch.setattr(
+        "openmenu_gdemu_manager.covers.providers.community_api.community_api_candidates",
+        lambda *args, **kwargs: [low_quality],
+    )
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search._enrich_for_dedupe", lambda candidates: candidates)
+
+    candidates = find_candidates(
+        GameItem(slot=1, name="Capcom vs. SNK"),
+        "capcom vs. SNK",
+        enabled_provider_ids=["community_api"],
+    )
+
+    assert candidates == []
