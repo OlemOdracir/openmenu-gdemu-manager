@@ -429,6 +429,10 @@ QLabel#AppLogo {{
     background: transparent;
     border: none;
 }}
+QLabel#SecurityIcon {{
+    background: transparent;
+    border: none;
+}}
 QLabel#Chip, QLabel#ChipAccent, QLabel#ChipSuccess, QLabel#ChipWarning {{
     border-radius: 12px;
     padding: 5px 10px;

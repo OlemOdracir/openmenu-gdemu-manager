@@ -9,6 +9,7 @@ from openmenu_gdemu_manager.ui.dialogs.setup_wizard import (
     _menu_label,
     _route_class_label,
 )
+from openmenu_gdemu_manager.ui.theme import build_stylesheet
 
 
 def _diagnostic(
@@ -76,3 +77,10 @@ def test_details_format_uses_bold_labels_and_code_values():
     assert "<b>Ruta:</b>" in html
     assert "font-family: Consolas" in html
     assert "<b>Menu:</b> No detectado" in html
+
+
+def test_setup_wizard_security_icon_style_is_transparent():
+    stylesheet = build_stylesheet("arcade_clean")
+
+    assert "QLabel#SecurityIcon" in stylesheet
+    assert "background: transparent;" in stylesheet
