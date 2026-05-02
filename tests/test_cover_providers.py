@@ -8,7 +8,7 @@ from openmenu_gdemu_manager.covers.providers.local import local_candidates
 from openmenu_gdemu_manager.covers.providers.screenscraper import (
     _api_query_variants,
     screenscraper_candidates,
-    test_connection,
+    test_connection as screenscraper_test_connection,
 )
 from openmenu_gdemu_manager.covers.providers.registry import provider_definitions
 
@@ -44,7 +44,7 @@ def test_scoring_rejects_sega_rally_for_metal_slug():
 def test_screenscraper_reports_missing_credentials():
     settings = {"cover_providers": {"screenscraper": {"base_url": "https://api.screenscraper.fr/api2"}}}
 
-    result = test_connection(settings)
+    result = screenscraper_test_connection(settings)
 
     assert result["ok"] is False
     assert "Configuracion incompleta" in result["message"]

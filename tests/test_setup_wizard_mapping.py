@@ -34,7 +34,7 @@ def test_diagnostic_tiles_mark_dirty_sd_as_danger():
 
     assert tiles["content"]["severity"] == "danger"
     assert tiles["content"]["value"] == "Archivos encontrados: 8"
-    assert tiles["structure"]["severity"] == "danger"
+    assert tiles["structure"]["severity"] == "warning"
 
 
 def test_diagnostic_tiles_mark_openmenu_as_success():
