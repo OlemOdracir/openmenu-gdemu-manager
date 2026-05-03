@@ -11,6 +11,7 @@ from ..core.dedupe import dedupe_candidates, enrich_candidate
 from ..core.matching import has_conflicting_numbers
 from ..core.models import Candidate, GameItem
 from ..config.paths import MANAGER_CACHE_DIR
+from ..services.cover_library import load_saved_candidates, save_candidates
 from .providers.base import USER_AGENT
 from .providers.registry import (
     iter_enabled_providers,
@@ -28,11 +29,17 @@ def find_candidates(
     query: str | None = None,
     include_remote: bool = True,
     enabled_provider_ids: list[str] | set[str] | tuple[str, ...] | None = None,
+    manual_mode: bool = False,
 ) -> list[Candidate]:
     settings = load_settings()
     query = query or game.name
     candidates: list[Candidate] = []
     preload_limit = int(settings.get("dedupe_preload_limit", 90) or 90)
+    if settings.get("cover_library_enabled", True):
+        try:
+            candidates.extend(load_saved_candidates(game))
+        except Exception:
+            log.exception("Could not load cover library candidates")
 
     allow_remote = include_remote and bool(settings.get("allow_remote_downloads", True))
     for provider in iter_enabled_providers(settings, include_remote=allow_remote, enabled_provider_ids=enabled_provider_ids):
@@ -46,8 +53,13 @@ def find_candidates(
     ]
     candidates = _merge_textual_duplicates(candidates)[:preload_limit]
     enriched = _enrich_for_dedupe(candidates)
-    deduped = dedupe_candidates(enriched)
-    return _progressive_results(deduped, limit, settings)
+    deduped = dedupe_candidates(enriched, exact_only=manual_mode)
+    if settings.get("cover_library_enabled", True):
+        try:
+            save_candidates(game, deduped, query)
+        except Exception:
+            log.exception("Could not save cover library candidates")
+    return _progressive_results(deduped, limit, settings, manual_mode=manual_mode)
 
 
 def best_auto_candidate(game: GameItem, query: str | None = None, include_remote: bool = True) -> Candidate | None:
@@ -149,7 +161,7 @@ def _candidate_text_rank(candidate: Candidate) -> tuple[int, int, int]:
     )
 
 
-def _progressive_results(candidates: list[Candidate], limit: int, settings: dict) -> list[Candidate]:
+def _progressive_results(candidates: list[Candidate], limit: int, settings: dict, manual_mode: bool = False) -> list[Candidate]:
     def review_threshold(candidate: Candidate) -> int:
         return provider_threshold(settings, source_provider_id(candidate.source), "min_review_score", 65)
 
@@ -158,9 +170,10 @@ def _progressive_results(candidates: list[Candidate], limit: int, settings: dict
         for c in candidates
         if _has_acceptable_preview_quality(c) and (c.product_match or c.alias_match or c.score >= review_threshold(c))
     ]
-    if len(strong) >= 6:
+    if len(strong) >= 6 and not manual_mode:
         return strong[:limit]
-    if settings.get("show_weak_candidates", False):
+    show_weak = manual_mode or settings.get("show_weak_candidates", False)
+    if show_weak:
         weak = [c for c in candidates if c not in strong]
         return [*strong, *weak][:limit]
     return strong[:limit]

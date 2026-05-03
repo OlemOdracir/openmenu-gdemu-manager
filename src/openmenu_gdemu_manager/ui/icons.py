@@ -21,6 +21,7 @@ TABLER_ACTION_ICONS = {
     "bulk_mode": "list",
     "bulk_search": "search",
     "cache": "database",
+    "candidate_pick": "photo",
     "close": "x",
     "correct": "check",
     "discard": "trash",

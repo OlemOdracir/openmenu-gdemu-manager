@@ -2,18 +2,24 @@ from openmenu_gdemu_manager.core.models import Candidate, GameItem
 from openmenu_gdemu_manager.covers.search import find_candidates
 
 
+def _settings_without_cover_library(settings: dict) -> dict:
+    return {**settings, "cover_library_enabled": False}
+
+
 def test_disabled_provider_is_not_executed(monkeypatch):
-    settings = {
-        "cover_providers": {
-            "local": {"enabled": False, "priority": 10, "min_review_score": 65},
-            "openmenu": {"enabled": False},
-            "libretro": {"enabled": False},
-            "screenscraper": {"enabled": False},
-        },
-        "allow_remote_downloads": True,
-        "candidate_limit": 60,
-        "dedupe_preload_limit": 90,
-    }
+    settings = _settings_without_cover_library(
+        {
+            "cover_providers": {
+                "local": {"enabled": False, "priority": 10, "min_review_score": 65},
+                "openmenu": {"enabled": False},
+                "libretro": {"enabled": False},
+                "screenscraper": {"enabled": False},
+            },
+            "allow_remote_downloads": True,
+            "candidate_limit": 60,
+            "dedupe_preload_limit": 90,
+        }
+    )
     monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
     monkeypatch.setattr(
         "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
@@ -24,14 +30,16 @@ def test_disabled_provider_is_not_executed(monkeypatch):
 
 
 def test_single_provider_override_runs_even_if_disabled(monkeypatch):
-    settings = {
-        "cover_providers": {
-            "local": {"enabled": False, "priority": 10, "min_review_score": 65},
-        },
-        "allow_remote_downloads": True,
-        "candidate_limit": 60,
-        "dedupe_preload_limit": 90,
-    }
+    settings = _settings_without_cover_library(
+        {
+            "cover_providers": {
+                "local": {"enabled": False, "priority": 10, "min_review_score": 65},
+            },
+            "allow_remote_downloads": True,
+            "candidate_limit": 60,
+            "dedupe_preload_limit": 90,
+        }
+    )
     monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
     monkeypatch.setattr(
         "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
@@ -49,14 +57,16 @@ def test_single_provider_override_runs_even_if_disabled(monkeypatch):
 
 
 def test_placeholder_candidate_is_filtered(monkeypatch):
-    settings = {
-        "cover_providers": {
-            "local": {"enabled": False, "priority": 10, "min_review_score": 65},
-        },
-        "allow_remote_downloads": True,
-        "candidate_limit": 60,
-        "dedupe_preload_limit": 90,
-    }
+    settings = _settings_without_cover_library(
+        {
+            "cover_providers": {
+                "local": {"enabled": False, "priority": 10, "min_review_score": 65},
+            },
+            "allow_remote_downloads": True,
+            "candidate_limit": 60,
+            "dedupe_preload_limit": 90,
+        }
+    )
     monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
     monkeypatch.setattr(
         "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
@@ -72,14 +82,16 @@ def test_placeholder_candidate_is_filtered(monkeypatch):
 
 
 def test_conflicting_sequence_candidate_is_filtered(monkeypatch):
-    settings = {
-        "cover_providers": {
-            "local": {"enabled": False, "priority": 10, "min_review_score": 65},
-        },
-        "allow_remote_downloads": True,
-        "candidate_limit": 60,
-        "dedupe_preload_limit": 90,
-    }
+    settings = _settings_without_cover_library(
+        {
+            "cover_providers": {
+                "local": {"enabled": False, "priority": 10, "min_review_score": 65},
+            },
+            "allow_remote_downloads": True,
+            "candidate_limit": 60,
+            "dedupe_preload_limit": 90,
+        }
+    )
     monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
     monkeypatch.setattr(
         "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
@@ -95,14 +107,16 @@ def test_conflicting_sequence_candidate_is_filtered(monkeypatch):
 
 
 def test_low_quality_remote_preview_is_not_strong_by_default(monkeypatch):
-    settings = {
-        "cover_providers": {
-            "community_api": {"enabled": False, "priority": 10, "min_review_score": 65},
-        },
-        "allow_remote_downloads": True,
-        "candidate_limit": 60,
-        "dedupe_preload_limit": 90,
-    }
+    settings = _settings_without_cover_library(
+        {
+            "cover_providers": {
+                "community_api": {"enabled": False, "priority": 10, "min_review_score": 65},
+            },
+            "allow_remote_downloads": True,
+            "candidate_limit": 60,
+            "dedupe_preload_limit": 90,
+        }
+    )
     low_quality = Candidate("community_api/screenscraper", "Capcom vs. SNK Millennium Collection", 80)
     low_quality.quality_score = 33
     monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)

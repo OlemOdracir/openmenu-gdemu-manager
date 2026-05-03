@@ -158,6 +158,26 @@ def patch_track05_menu(track_path: Path, games: list[GameItem]) -> None:
     track_path = Path(track_path)
     if not track_path.exists():
         return
+    block, start, original_span = _track05_menu_block(track_path, games)
+    if len(block) > original_span:
+        raise ValueError(_menu_capacity_error(len(block), original_span))
+    data = track_path.read_bytes()
+    padded = block + (b"\x00" * (original_span - len(block)))
+    with track_path.open("r+b") as handle:
+        handle.seek(start)
+        handle.write(padded)
+
+
+def validate_track05_menu_capacity(track_path: Path, games: list[GameItem]) -> None:
+    track_path = Path(track_path)
+    if not track_path.exists():
+        return
+    block, _start, original_span = _track05_menu_block(track_path, games)
+    if len(block) > original_span:
+        raise ValueError(_menu_capacity_error(len(block), original_span))
+
+
+def _track05_menu_block(track_path: Path, games: list[GameItem]) -> tuple[bytes, int, int]:
     data = track_path.read_bytes()
     start = data.find(b"[OPENMENU]")
     if start == -1:
@@ -167,12 +187,17 @@ def patch_track05_menu(track_path: Path, games: list[GameItem]) -> None:
         raise ValueError("No se encontro el final del bloque del menu en track05.iso")
     original_span = end - start
     block = build_openmenu_text(games, newline="\n").encode("latin-1", errors="replace")
-    if len(block) > original_span:
-        raise ValueError(f"El bloque del menu excede el espacio disponible ({len(block)} > {original_span})")
-    padded = block + (b"\x00" * (original_span - len(block)))
-    with track_path.open("r+b") as handle:
-        handle.seek(start)
-        handle.write(padded)
+    return block, start, original_span
+
+
+def _menu_capacity_error(used: int, available: int) -> str:
+    over = max(0, used - available)
+    return (
+        "El bloque del menu excede el espacio disponible "
+        f"({used / 1024:.1f} KB usados > {available / 1024:.1f} KB disponibles; "
+        f"faltan {over / 1024:.1f} KB). "
+        f"Detalle tecnico: {used} > {available} bytes."
+    )
 
 
 def patch_track05_cover(track_path: Path, cover_index: int, image_path: Path) -> None:

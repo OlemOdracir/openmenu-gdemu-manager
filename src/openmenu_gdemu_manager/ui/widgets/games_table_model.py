@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..image_qt import file_to_pixmap, pil_to_pixmap
 from ...core.models import BulkProposal, GameItem
+from ...core.placeholder import ensure_no_cover_asset
 from ...config.settings import load_settings, ui_settings
 from ...i18n import tr, translate_status
 from ..theme import template_palette
@@ -241,6 +242,15 @@ class GamesTableModel(QAbstractTableModel):
             if key not in self._pixmap_cache:
                 try:
                     self._pixmap_cache[key] = file_to_pixmap(game.current_cover, (92, 92))
+                except Exception:
+                    return None
+            return self._pixmap_cache[key]
+        if game.has_placeholder_cover or game.status == "faltante":
+            placeholder = ensure_no_cover_asset()
+            key = str(placeholder)
+            if key not in self._pixmap_cache:
+                try:
+                    self._pixmap_cache[key] = file_to_pixmap(placeholder, (92, 92))
                 except Exception:
                     return None
             return self._pixmap_cache[key]

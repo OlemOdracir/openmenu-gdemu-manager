@@ -564,6 +564,35 @@ QLabel#CurrentCover, QLabel#CandidatePreview {{
     border: 1px solid {c['border']};
     border-radius: 14px;
 }}
+QFrame#CandidateCard {{
+    border: 1px solid {c['border']};
+    border-radius: 14px;
+    background: {c['surface_alt']};
+}}
+QLabel#QualityBadgeSuccess {{
+    background: {c['success']};
+    color: {c['surface']};
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 9pt;
+    font-weight: 700;
+}}
+QLabel#QualityBadgeWarning {{
+    background: {c['warning']};
+    color: {c['surface']};
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 9pt;
+    font-weight: 700;
+}}
+QLabel#QualityBadgeDanger {{
+    background: {c['danger']};
+    color: {c['surface']};
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 9pt;
+    font-weight: 700;
+}}
 QTableView, QTableWidget {{
     background: {c['surface']};
     alternate-background-color: {c['table_alt']};

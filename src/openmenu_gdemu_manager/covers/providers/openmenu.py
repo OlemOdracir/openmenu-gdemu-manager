@@ -16,6 +16,13 @@ OPENMENU_FOLDERS = [
     "AW_NTSC_input",
     "AW_PAL_input",
 ]
+_FOLDER_REGION = {
+    "USA_input": "U",
+    "PAL_input": "E",
+    "JAP_input": "J",
+    "AW_NTSC_input": "U",
+    "AW_PAL_input": "E",
+}
 
 
 def openmenu_candidates(game: GameItem, query: str) -> list[Candidate]:
@@ -46,6 +53,7 @@ def openmenu_candidates(game: GameItem, query: str) -> list[Candidate]:
                         product_match=product_match,
                         alias_match=alias_match,
                         weak_match=score < 70 and not product_match and not alias_match,
+                        region=_FOLDER_REGION.get(folder, ""),
                     )
                 )
     return out

@@ -50,6 +50,7 @@ class Candidate:
     product_match: bool = False
     alias_match: bool = False
     weak_match: bool = False
+    region: str = ""
     width: int = 0
     height: int = 0
     quality_label: str = ""

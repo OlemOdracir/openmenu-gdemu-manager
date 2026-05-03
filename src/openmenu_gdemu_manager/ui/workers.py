@@ -18,11 +18,12 @@ from ..covers.providers.registry import provider_threshold, source_provider_id
 from ..config.settings import load_settings
 from ..dreamcast.sd_writer import (
     copy_game_source, patch_track05_cover, patch_track05_menu,
-    send_to_recycle_bin, source_size, write_name_txt, write_openmenu_ini,
+    send_to_recycle_bin, source_size, validate_track05_menu_capacity, write_name_txt, write_openmenu_ini,
 )
 from ..config.state import drop_game_state, flush_state, patch_game_state
 from ..dreamcast.storage_diagnostics import diagnose_storage
 from ..services.cover_service import persist_cover_selection
+from ..services.cover_library import count_new_candidates, load_saved_candidates
 from ..services.game_service import build_pending_game, next_free_slot
 
 log = logging.getLogger(__name__)
@@ -131,7 +132,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
 
 
 class SearchWorker(QObject):
-    finished = Signal(list)
+    finished = Signal(object)
     error = Signal(str)
 
     def __init__(self, game: GameItem, query: str):
@@ -142,7 +143,17 @@ class SearchWorker(QObject):
     def run(self):
         try:
             log.info("SearchWorker started: slot=%03d query=%s", self.game.slot, self.query)
-            self.finished.emit(find_candidates(self.game, self.query, include_remote=True))
+            try:
+                previous = load_saved_candidates(self.game)
+            except Exception:
+                log.exception("Could not read cover library before search")
+                previous = []
+            candidates = find_candidates(self.game, self.query, include_remote=True, manual_mode=True)
+            self.finished.emit({
+                "candidates": candidates,
+                "new_count": count_new_candidates(previous, candidates),
+                "saved_count": len(previous),
+            })
         except Exception as exc:
             log.exception("SearchWorker failed")
             self.error.emit(str(exc))
@@ -318,6 +329,7 @@ class SaveChangesWorker(QObject):
             deletions = [game for game in self.games if game.pending_delete and game.folder]
             additions = [game for game in self.games if game.pending_add and game.source_path]
             kept = [game for game in self.games if not game.pending_delete]
+            validate_track05_menu_capacity(self.root_path / "01" / "track05.iso", kept)
             cover_targets = [
                 game
                 for game in kept

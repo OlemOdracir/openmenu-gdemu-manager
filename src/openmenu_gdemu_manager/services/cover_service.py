@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from PIL import Image
@@ -7,6 +8,10 @@ from ..config.state import update_game_state
 from ..core.image_quality import NORMALIZATION_MODE, apply_quality_report, save_cover_set
 from ..core.matching import safe_filename
 from ..core.models import Candidate, GameItem
+from .cover_library import persist_selected_cover_to_library, preserve_existing_cover
+
+
+log = logging.getLogger(__name__)
 
 
 def persist_cover_selection(
@@ -21,6 +26,11 @@ def persist_cover_selection(
     root_path: Path,
     persist_state: bool = True,
 ) -> Path:
+    try:
+        preserve_existing_cover(game)
+        persist_selected_cover_to_library(game, candidate, image)
+    except Exception:
+        log.exception("Could not update cover library")
     base_name = safe_filename(game.slot, game.name)
     original_path, normalized_path, preview_path, quality = save_cover_set(
         image,

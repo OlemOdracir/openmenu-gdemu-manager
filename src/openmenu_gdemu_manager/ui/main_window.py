@@ -739,7 +739,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def open_dialog(self, game: GameItem):
-        dialog = CandidateDialog(game, self)
+        dialog = CandidateDialog(game, self, auto_search=True)
         dialog.selected.connect(lambda cand, image, g=game: self.save_selected_cover(g, cand, image))
         dialog.name_saved.connect(lambda name, g=game: self.save_game_name(g, name))
         dialog.exec()

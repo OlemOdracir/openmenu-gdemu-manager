@@ -44,10 +44,10 @@ def hamming_distance(left: str, right: str) -> int:
         return 64
 
 
-def dedupe_candidates(candidates: list[Candidate]) -> list[Candidate]:
+def dedupe_candidates(candidates: list[Candidate], exact_only: bool = False) -> list[Candidate]:
     unique: list[Candidate] = []
     for candidate in sorted(candidates, key=_candidate_rank, reverse=True):
-        duplicate = _find_duplicate(unique, candidate)
+        duplicate = _find_duplicate(unique, candidate, exact_only=exact_only)
         if duplicate is None:
             candidate.duplicate_sources = candidate.duplicate_sources or []
             unique.append(candidate)
@@ -60,11 +60,11 @@ def dedupe_candidates(candidates: list[Candidate]) -> list[Candidate]:
     return sorted(unique, key=_candidate_rank, reverse=True)
 
 
-def _find_duplicate(existing: list[Candidate], candidate: Candidate) -> Candidate | None:
+def _find_duplicate(existing: list[Candidate], candidate: Candidate, exact_only: bool = False) -> Candidate | None:
     for item in existing:
         if candidate.exact_hash and item.exact_hash and candidate.exact_hash == item.exact_hash:
             return item
-        if candidate.perceptual_hash and item.perceptual_hash:
+        if not exact_only and candidate.perceptual_hash and item.perceptual_hash:
             if hamming_distance(candidate.perceptual_hash, item.perceptual_hash) <= 6:
                 return item
     return None

@@ -38,6 +38,7 @@ INBOX_NORMALIZED_DIR = INBOX_DIR / "normalized"
 INBOX_PREVIEW_DIR = INBOX_DIR / "preview"
 CACHE_DIR = BASE_DIR / "_cover_tool_cache"
 MANAGER_CACHE_DIR = BASE_DIR / "_cover_manager_cache"
+COVER_LIBRARY_DIR = BASE_DIR / "_cover_library"
 STATE_PATH = BASE_DIR / "_cover_manager_state.json"
 SETTINGS_PATH = BASE_DIR / "cover_sources.json"
 LOG_PATH = BASE_DIR / "openmenu_gdemu_manager.log"
@@ -62,6 +63,7 @@ LEGACY_RUNTIME_ITEMS = [
     "_cover_inbox",
     "_cover_tool_cache",
     "_cover_manager_cache",
+    "_cover_library",
     "images",
     "_cover_sources",
     "_downloaded_covers",
