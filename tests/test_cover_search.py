@@ -133,3 +133,51 @@ def test_low_quality_remote_preview_is_not_strong_by_default(monkeypatch):
     )
 
     assert candidates == []
+
+
+def test_manual_mode_includes_weak_candidates(monkeypatch):
+    settings = _settings_without_cover_library({
+        "candidate_limit": 10,
+        "show_weak_candidates": False,
+        "allow_remote_downloads": True,
+        "dedupe_preload_limit": 90,
+        "cover_providers": {
+            "local": {"enabled": True, "priority": 10, "min_review_score": 65},
+        },
+    })
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search._enrich_for_dedupe", lambda candidates: candidates)
+    monkeypatch.setattr(
+        "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
+        lambda *args, **kwargs: [Candidate("local", "Game 1", 80, product_match=True), Candidate("local", "Alternate Cover", 50)],
+    )
+    results = find_candidates(GameItem(slot=1, name="Game"), manual_mode=True, enabled_provider_ids=["local"])
+    assert len(results) == 2
+    results = find_candidates(GameItem(slot=1, name="Game"), manual_mode=False, enabled_provider_ids=["local"])
+    assert len(results) == 1
+
+
+def test_manual_mode_does_not_cutoff_at_six_strong(monkeypatch):
+    settings = _settings_without_cover_library({
+        "candidate_limit": 10,
+        "show_weak_candidates": False,
+        "allow_remote_downloads": True,
+        "dedupe_preload_limit": 90,
+        "cover_providers": {
+            "local": {"enabled": True, "priority": 10, "min_review_score": 65},
+        },
+    })
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search.load_settings", lambda: settings)
+    monkeypatch.setattr("openmenu_gdemu_manager.covers.search._enrich_for_dedupe", lambda candidates: candidates)
+    monkeypatch.setattr(
+        "openmenu_gdemu_manager.covers.providers.registry.local_candidates",
+        lambda *args, **kwargs: [
+            Candidate("local", f"Game {i}", 80, product_match=True) for i in range(6)
+        ] + [
+            Candidate("local", f"Weak Cover {i}", 50) for i in range(3)
+        ],
+    )
+    results = find_candidates(GameItem(slot=1, name="Game"), manual_mode=True, enabled_provider_ids=["local"])
+    assert len(results) == 9
+    results = find_candidates(GameItem(slot=1, name="Game"), manual_mode=False, enabled_provider_ids=["local"])
+    assert len(results) == 6
