@@ -3,7 +3,16 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .paths import BASE_DIR, LANGUAGES_DIR, LOCAL_IMAGE_DIRS, SETTINGS_PATH, UI_TEMPLATES_DIR
+from .paths import (
+    BASE_DIR,
+    BUNDLED_BUILDGDI_PATH,
+    INBOX_NORMALIZED_DIR,
+    INBOX_ORIGINALS_DIR,
+    LANGUAGES_DIR,
+    LOCAL_IMAGE_DIRS,
+    SETTINGS_PATH,
+    UI_TEMPLATES_DIR,
+)
 
 
 DEFAULT_SETTINGS: dict[str, Any] = {
@@ -126,6 +135,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "default_import_mode": "copy",
     "openmenu_setup": {
         "template_dir": "_OpenMenuBuild",
+        "buildgdi_path": str(BUNDLED_BUILDGDI_PATH),
+        "buildgdi_expected_version": "BuildGDI v2.1.1",
+        "buildgdi_expected_sha256": "52C0B7388DEFF46652F35F3F26AC8D2E6B29720E06BD7EDE450DAA0DFF0A8C5E",
+        "menu_gdi_dir": r"D:\Proyectos\openmenu-gdemu-lab\external\GDMENUCardManager\src\GDMENUCardManager.Core\tools\openMenu\menu_gdi",
+        "menu_data_dir": r"D:\Proyectos\openmenu-gdemu-lab\external\GDMENUCardManager\src\GDMENUCardManager.Core\tools\openMenu\menu_data",
+        "menu_source_mode": "current_sd",
     },
     "web_search_templates": [
         {
@@ -208,7 +223,13 @@ def merge_settings(defaults: dict[str, Any], loaded: dict[str, Any]) -> dict[str
 
 def configured_local_dirs(settings: dict[str, Any]) -> list[Path]:
     result: list[Path] = []
-    for raw in settings.get("local_image_dirs", []):
+    configured = list(settings.get("local_image_dirs") or [
+        *LOCAL_IMAGE_DIRS,
+        BASE_DIR / "_cover_manager_cache" / "downloads",
+        INBOX_ORIGINALS_DIR,
+        INBOX_NORMALIZED_DIR,
+    ])
+    for raw in configured:
         path = Path(str(raw))
         if not path.is_absolute():
             path = BASE_DIR / path
@@ -257,6 +278,45 @@ def supported_media_types(settings: dict[str, Any]) -> set[str]:
 def configured_openmenu_template_dir(settings: dict[str, Any] | None = None) -> Path:
     settings = settings or load_settings()
     raw = settings.get("openmenu_setup", {}).get("template_dir", "_OpenMenuBuild")
+    path = Path(str(raw))
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path
+
+
+def configured_buildgdi_path(settings: dict[str, Any] | None = None) -> Path:
+    settings = settings or load_settings()
+    if BUNDLED_BUILDGDI_PATH.exists():
+        return BUNDLED_BUILDGDI_PATH
+    raw = settings.get("openmenu_setup", {}).get("buildgdi_path", "")
+    path = Path(str(raw))
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path
+
+
+def configured_buildgdi_expected_version(settings: dict[str, Any] | None = None) -> str:
+    settings = settings or load_settings()
+    return str(settings.get("openmenu_setup", {}).get("buildgdi_expected_version", "") or "").strip()
+
+
+def configured_buildgdi_expected_sha256(settings: dict[str, Any] | None = None) -> str:
+    settings = settings or load_settings()
+    return str(settings.get("openmenu_setup", {}).get("buildgdi_expected_sha256", "") or "").strip().upper()
+
+
+def configured_menu_gdi_dir(settings: dict[str, Any] | None = None) -> Path:
+    settings = settings or load_settings()
+    raw = settings.get("openmenu_setup", {}).get("menu_gdi_dir", "")
+    path = Path(str(raw))
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return path
+
+
+def configured_menu_data_dir(settings: dict[str, Any] | None = None) -> Path:
+    settings = settings or load_settings()
+    raw = settings.get("openmenu_setup", {}).get("menu_data_dir", "")
     path = Path(str(raw))
     if not path.is_absolute():
         path = BASE_DIR / path

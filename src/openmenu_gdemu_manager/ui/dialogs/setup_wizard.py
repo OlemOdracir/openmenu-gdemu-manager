@@ -46,6 +46,7 @@ from ...i18n import tr
 from ...services.backup_service import (
     BackupError, backup_sd_contents, backup_decision, set_backup_decision, suggested_backup_dir,
 )
+from ...services.sd_registry import registered_backup_exists, write_backup_registry
 from ...services.setup_service import OpenMenuSetupError, install_openmenu_base
 from ..theme import template_palette
 from ..icons import app_logo_pixmap, sd_card_qicon, vendor_qicon
@@ -428,7 +429,12 @@ class SetupWizardDialog(QDialog):
             warnings.append("Modo seguro: las acciones de escritura quedan bloqueadas.")
         self.warning.setText("\n".join(warnings))
         self.warning.setVisible(bool(warnings))
-        show_backup = _backup_recommended(diagnostic) and (self.force_backup_prompt or backup_decision(self.settings, diagnostic) is None)
+        decision = backup_decision(self.settings, diagnostic)
+        show_backup = (
+            _backup_recommended(diagnostic)
+            and not registered_backup_exists(diagnostic.root)
+            and (self.force_backup_prompt or not (decision and decision.get("decision") == "skipped"))
+        )
         self.backup_button.setVisible(show_backup)
         self.backup_button.setEnabled(show_backup)
         self.skip_backup_button.setVisible(show_backup)
@@ -475,14 +481,10 @@ class SetupWizardDialog(QDialog):
             self.run_diagnostic()
         if self.diagnostic is None or not self.diagnostic.prepare_allowed:
             return
-        answer = QMessageBox.question(
+        if not _confirm_dialog(
             self,
-            APP_NAME,
-            "Se instalara OpenMenu base en la ruta seleccionada.\n\n"
-            "La app revalidara que la ruta este vacia y no borrara archivos existentes.\n"
-            "Continuar?",
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+            tr("dialog.setup.install_confirm"),
+        ):
             return
         try:
             self.diagnostic = install_openmenu_base(self.diagnostic.root, load_settings())
@@ -511,7 +513,7 @@ class SetupWizardDialog(QDialog):
         default_target = suggested_backup_dir(self.diagnostic.root)
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Seleccionar carpeta para respaldo",
+            tr("dialog.backup.select_folder"),
             str(default_target.parent),
         )
         if not folder:
@@ -520,31 +522,15 @@ class SetupWizardDialog(QDialog):
         if target.name.lower() != default_target.name.lower():
             target = target / default_target.name
         if target.exists() and any(target.iterdir()):
-            overwrite_answer = QMessageBox.warning(
+            if not _confirm_dialog(
                 self,
-                APP_NAME,
-                "La carpeta destino ya contiene datos:\n\n"
-                f"{target}\n\n"
-                "El respaldo podria sobrescribir archivos con el mismo nombre. "
-                "Se recomienda elegir una carpeta vacia o crear una nueva.\n\n"
-                "Continuar de todos modos?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if overwrite_answer != QMessageBox.StandardButton.Yes:
+                tr("dialog.backup.folder_confirm", path=target),
+            ):
                 return
-        answer = QMessageBox.warning(
+        if not _confirm_dialog(
             self,
-            APP_NAME,
-            "Se copiara el contenido actual de la SD/carpeta a:\n\n"
-            f"{target}\n\n"
-            "La app no se hace responsable por perdida de informacion causada por seleccionar rutas incorrectas. "
-            "Verifica que el destino este en tu disco duro y no dentro de la SD.\n\n"
-            "Continuar?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+            tr("dialog.backup.confirm", path=target),
+        ):
             return
         self.backup_progress_bar.setVisible(True)
         self.backup_progress_bar.setRange(0, 0)
@@ -566,7 +552,7 @@ class SetupWizardDialog(QDialog):
     def backup_progress(self, current: int, total: int, file_name: str):
         self.backup_progress_bar.setRange(0, total)
         self.backup_progress_bar.setValue(current)
-        self.summary.setText(f"Respaldando SD... {current} de {total}: {file_name}")
+        self.summary.setText(tr("dialog.backup.progress", current=current, total=total, file=file_name))
 
     def backup_finished(self, destination: str):
         self.backup_progress_bar.setVisible(False)
@@ -575,35 +561,30 @@ class SetupWizardDialog(QDialog):
         self.skip_backup_button.setVisible(False)
         if self.diagnostic is not None:
             self.settings = set_backup_decision(self.settings, self.diagnostic, "backed_up", Path(destination))
+            write_backup_registry(self.diagnostic.root, Path(destination))
             save_settings(self.settings)
-        QMessageBox.information(self, APP_NAME, f"Respaldo completado:\n{destination}")
-        self.summary.setText(f"Respaldo completado: {destination}")
+        QMessageBox.information(self, APP_NAME, tr("dialog.backup.done_detail", path=destination))
+        self.summary.setText(tr("dialog.backup.done", path=destination))
 
     def backup_error(self, message: str):
         self.backup_progress_bar.setVisible(False)
         self.use_button.setEnabled(True)
         self.backup_button.setEnabled(True)
-        QMessageBox.warning(self, APP_NAME, f"No se pudo completar el respaldo:\n{message}")
+        QMessageBox.warning(self, APP_NAME, tr("dialog.backup.failed", message=message))
 
     def skip_backup_for_current_sd(self):
         if self.diagnostic is None:
             return
-        answer = QMessageBox.warning(
+        if not _confirm_dialog(
             self,
-            APP_NAME,
-            "No se volvera a sugerir respaldo automaticamente para esta SD mientras su estructura no cambie.\n\n"
-            "Podras ejecutar respaldo manual desde Configuracion.\n\n"
-            "Continuar?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+            tr("dialog.backup.skip_confirm"),
+        ):
             return
         self.settings = set_backup_decision(self.settings, self.diagnostic, "skipped")
         save_settings(self.settings)
         self.backup_button.setVisible(False)
         self.skip_backup_button.setVisible(False)
-        self.summary.setText("Sugerencia de respaldo omitida para esta SD.")
+        self.summary.setText(tr("dialog.setup.backup_skipped"))
 
 
 def _diagnostic_severity(diagnostic: StorageDiagnostic) -> str:
@@ -616,6 +597,18 @@ def _diagnostic_severity(diagnostic: StorageDiagnostic) -> str:
     return "danger"
 
 
+def _confirm_dialog(parent: QWidget, text: str) -> bool:
+    message = QMessageBox(parent)
+    message.setWindowTitle(APP_NAME)
+    message.setIcon(QMessageBox.Icon.Information)
+    message.setText(text)
+    continue_button = message.addButton(tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
+    cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
+    message.setDefaultButton(cancel_button)
+    message.exec()
+    return message.clickedButton() is continue_button
+
+
 def _backup_recommended(diagnostic: StorageDiagnostic) -> bool:
     summary = diagnostic.summary
     if summary is None:
@@ -626,42 +619,39 @@ def _backup_recommended(diagnostic: StorageDiagnostic) -> bool:
 
 def _diagnostic_title(diagnostic: StorageDiagnostic) -> str:
     if diagnostic.write_allowed:
-        return "Ruta lista para usar"
+        return tr("dialog.setup.diagnostic.ready")
     if diagnostic.prepare_allowed:
-        return "SD vacia lista para preparar"
+        return tr("dialog.setup.diagnostic.empty_ready")
     if diagnostic.scan_allowed:
-        return "Ruta en modo solo lectura"
+        return tr("dialog.setup.diagnostic.read_only")
     if diagnostic.route_class == "dangerous_path":
-        return "No se puede continuar con esta ruta"
+        return tr("dialog.setup.diagnostic.blocked")
     if diagnostic.storage_health == "not_fat32":
-        return "La unidad no es compatible"
+        return tr("dialog.setup.diagnostic.incompatible")
     if diagnostic.storage_health == "possible_corruption":
-        return "Posible corrupcion detectada"
-    return "Ruta bloqueada por seguridad"
+        return tr("dialog.setup.diagnostic.possible_corruption")
+    return tr("dialog.setup.diagnostic.safety_block")
 
 
 def _diagnostic_message(diagnostic: StorageDiagnostic) -> str:
     reason = diagnostic.reason.strip()
     if diagnostic.prepare_allowed:
         return (
-            "La SD no tiene estructura GDEMU/OpenMenu.\n\n"
-            "Puedes instalar OpenMenu base para comenzar a agregar juegos. "
-            "No se copiaran juegos todavia y no se borrara contenido existente."
+            tr("dialog.setup.message.prepare")
         )
     if diagnostic.route_class == "dangerous_path":
         return (
             f"{reason}\n\n"
-            "Para proteger tus datos, la app bloqueo la lectura/escritura. Usa una SD vacia, "
-            "una SD con estructura GDEMU/OpenMenu, o una carpeta de respaldo limpia."
+            + tr("dialog.setup.message.dangerous")
         )
     if diagnostic.storage_health == "not_fat32":
-        return f"{reason}\n\nFormatea o prepara la SD en FAT32 antes de usarla con GDEMU."
+        return f"{reason}\n\n{tr('dialog.setup.message.not_fat32')}"
     if diagnostic.storage_health == "possible_corruption":
-        return f"{reason}\n\nRevisa la SD fuera de la app antes de intentar escribir cambios."
+        return f"{reason}\n\n{tr('dialog.setup.message.possible_corruption')}"
     if not diagnostic.write_allowed and diagnostic.scan_allowed:
-        return f"{reason}\n\nPuedes revisar la estructura, pero guardar cambios queda bloqueado."
+        return f"{reason}\n\n{tr('dialog.setup.message.scan_only')}"
     if diagnostic.write_allowed:
-        return f"{reason}\n\nPuedes escanear y aplicar cambios."
+        return f"{reason}\n\n{tr('dialog.setup.message.write_allowed')}"
     return reason
 
 
@@ -703,12 +693,12 @@ def _severity_variant(severity: str) -> str:
 
 def _tile_specs() -> list[dict[str, str]]:
     return [
-        {"id": "unit", "title": "Estado de unidad", "icon": "drive", "vendor_icon": "database", "icon_size": "58"},
-        {"id": "filesystem", "title": "Sistema de archivos", "icon": "filesystem", "vendor_icon": "cpu", "icon_size": "58"},
-        {"id": "structure", "title": "Estructura GDEMU", "icon": "folder_tree", "vendor_icon": "hierarchy", "icon_size": "70"},
+        {"id": "unit", "title": tr("dialog.setup.tile.unit"), "icon": "drive", "vendor_icon": "database", "icon_size": "58"},
+        {"id": "filesystem", "title": tr("dialog.setup.tile.filesystem"), "icon": "filesystem", "vendor_icon": "cpu", "icon_size": "58"},
+        {"id": "structure", "title": tr("dialog.setup.tile.structure"), "icon": "folder_tree", "vendor_icon": "hierarchy", "icon_size": "70"},
         {
             "id": "content",
-            "title": "Contenido no GDEMU",
+            "title": tr("dialog.setup.tile.content"),
             "icon": "folder",
             "vendor_icon": "folders",
             "count_badge": "true",
@@ -730,15 +720,15 @@ def _diagnostic_tiles(diagnostic: StorageDiagnostic) -> list[dict[str, str]]:
 
     fs_severity = "success"
     if is_local_folder:
-        fs_value = "No aplica en carpeta local"
+        fs_value = tr("dialog.setup.value.local_folder_na")
     elif diagnostic.storage_health == "not_fat32":
         fs_severity = "danger"
-        fs_value = f"{filesystem} detectado"
+        fs_value = tr("dialog.setup.value.detected", value=filesystem)
     elif filesystem not in {"-", ""} and filesystem.upper() != "FAT32":
         fs_severity = "warning"
-        fs_value = f"{filesystem} detectado"
+        fs_value = tr("dialog.setup.value.detected", value=filesystem)
     else:
-        fs_value = f"{filesystem} detectado" if filesystem != "-" else "No detectado"
+        fs_value = tr("dialog.setup.value.detected", value=filesystem) if filesystem != "-" else tr("dialog.setup.value.not_detected")
 
     if diagnostic.menu_state == "openmenu_compatible":
         structure_severity = "success"
@@ -754,11 +744,11 @@ def _diagnostic_tiles(diagnostic: StorageDiagnostic) -> list[dict[str, str]]:
     return [
         {"id": "unit", "severity": unit_severity, "value": _health_label(diagnostic.storage_health)},
         {"id": "filesystem", "severity": fs_severity, "value": fs_value},
-        {"id": "structure", "severity": structure_severity, "value": _menu_label(diagnostic.menu_state) if numeric_dirs else "No detectada"},
+        {"id": "structure", "severity": structure_severity, "value": _menu_label(diagnostic.menu_state) if numeric_dirs else tr("dialog.setup.value.not_detected_f")},
         {
             "id": "content",
             "severity": content_severity,
-            "value": f"Archivos encontrados: {other_entries}",
+            "value": tr("dialog.setup.value.files_found", count=other_entries),
             "count": other_entries,
         },
     ]
@@ -808,41 +798,41 @@ def _format_detail_lines(lines: list[tuple[str, str, bool]]) -> str:
 
 def _route_class_label(value: str) -> str:
     return {
-        "empty_safe": "Ruta vacia segura",
-        "gdemu_structure": "Estructura GDEMU/OpenMenu",
-        "dangerous_path": "Ruta bloqueada",
-        "unknown": "No reconocida",
-        "local_backup": "Respaldo local",
+        "empty_safe": tr("dialog.setup.route.empty_safe"),
+        "gdemu_structure": tr("dialog.setup.route.gdemu_structure"),
+        "dangerous_path": tr("dialog.setup.route.dangerous_path"),
+        "unknown": tr("dialog.setup.route.unknown"),
+        "local_backup": tr("dialog.setup.route.local_backup"),
     }.get(value, value or "-")
 
 
 def _health_label(value: str) -> str:
     return {
-        "ok": "Correcta",
-        "not_fat32": "No es FAT32",
-        "possible_corruption": "Posible corrupcion",
-        "not_accessible": "No accesible",
-        "local_folder": "Carpeta local",
+        "ok": tr("dialog.setup.health.ok"),
+        "not_fat32": tr("dialog.setup.health.not_fat32"),
+        "possible_corruption": tr("dialog.setup.health.possible_corruption"),
+        "not_accessible": tr("dialog.setup.health.not_accessible"),
+        "local_folder": tr("dialog.setup.health.local_folder"),
     }.get(value, value or "-")
 
 
 def _menu_label(value: str) -> str:
     return {
-        "openmenu_compatible": "OpenMenu compatible",
-        "openmenu_old": "OpenMenu antiguo",
-        "gdmenu_basic": "GDEMU/gdMenu basico",
-        "no_menu": "Sin menu",
-        "unknown": "No detectado",
+        "openmenu_compatible": tr("dialog.setup.menu.openmenu_compatible"),
+        "openmenu_old": tr("dialog.setup.menu.openmenu_old"),
+        "gdmenu_basic": tr("dialog.setup.menu.gdmenu_basic"),
+        "no_menu": tr("dialog.setup.menu.no_menu"),
+        "unknown": tr("dialog.setup.value.not_detected"),
     }.get(value, value or "-")
 
 
 def _drive_type_label(value: str) -> str:
     return {
-        "removable": "Unidad extraible",
-        "fixed": "Disco interno",
-        "network": "Unidad de red",
+        "removable": tr("dialog.setup.drive.removable"),
+        "fixed": tr("dialog.setup.drive.fixed"),
+        "network": tr("dialog.setup.drive.network"),
         "cdrom": "CD/DVD",
         "ramdisk": "RAM disk",
-        "unknown": "No detectado",
+        "unknown": tr("dialog.setup.value.not_detected"),
     }.get(value, value or "-")
 

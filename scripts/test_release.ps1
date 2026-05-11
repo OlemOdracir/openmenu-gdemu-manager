@@ -32,6 +32,9 @@ $requiredFiles = @(
   (Join-Path $PortableRoot "README-PORTABLE.txt"),
   (Join-Path $PortableRoot "LICENSE.txt"),
   (Join-Path $PortableRoot "THIRD_PARTY_NOTICES.md"),
+  (Join-Path $PortableRoot "_internal\third_party\buildgdi\buildgdi.exe"),
+  (Join-Path $PortableRoot "_internal\third_party\buildgdi\LICENSE-DiscUtilsGD.txt"),
+  (Join-Path $PortableRoot "_internal\third_party\buildgdi\SHA256SUMS.txt"),
   $ZipPath,
   $ChecksumPath
 )
@@ -45,8 +48,16 @@ foreach ($path in $requiredFiles) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)
 try {
-  $entries = @($zip.Entries | ForEach-Object { $_.FullName })
-  foreach ($entry in @("$Name.exe", "README-PORTABLE.txt", "LICENSE.txt", "THIRD_PARTY_NOTICES.md")) {
+  $entries = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+  foreach ($entry in @(
+    "$Name.exe",
+    "README-PORTABLE.txt",
+    "LICENSE.txt",
+    "THIRD_PARTY_NOTICES.md",
+    "_internal/third_party/buildgdi/buildgdi.exe",
+    "_internal/third_party/buildgdi/LICENSE-DiscUtilsGD.txt",
+    "_internal/third_party/buildgdi/SHA256SUMS.txt"
+  )) {
     if ($entries -notcontains $entry) {
       throw "ZIP is missing required entry: $entry"
     }

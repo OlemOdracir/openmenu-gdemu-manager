@@ -6,8 +6,8 @@ import webbrowser
 from pathlib import Path
 
 from PIL import Image
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer
-from PySide6.QtGui import QAction, QActionGroup
+from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt, QThread, QTimer
+from PySide6.QtGui import QAction, QActionGroup, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -23,6 +23,9 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QDialog,
+    QGraphicsDropShadowEffect,
+    QStyle,
+    QStyleOptionButton,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -58,8 +61,10 @@ from ..config.state import load_state, update_game_state
 from ..dreamcast.storage_diagnostics import StorageDiagnostic
 from ..services.bulk_service import has_saveable_proposal, valid_cover_proposals
 from ..services.backup_service import backup_decision
+from ..services.sd_registry import registered_backup_exists
 from ..services.cover_service import persist_cover_selection
 from ..services.game_service import build_pending_game, next_free_slot
+from ..services.sd_slot_transaction import SdSlotTransactionService, incomplete_slot_transactions
 from .icons import action_qicon, app_logo_pixmap, app_qicon, sd_card_qicon, status_qicon
 from .theme import (
     apply_template, available_templates, install_template_package, refresh_templates,
@@ -79,6 +84,85 @@ from .dialogs.about import app_version
 
 STATUS_OPTIONS = ["todos", "no_revisada", "correcta", "dudosa", "faltante", "seleccionada"]
 log = logging.getLogger(__name__)
+
+
+def _bulk_selection_map(games: list[GameItem], checked: bool) -> dict[int, bool]:
+    return {game.slot: checked for game in games}
+
+
+def _product_id_corrections(games: list[GameItem]) -> list[GameItem]:
+    return [
+        game for game in games
+        if game.save_status == "pendiente_guardar"
+        and bool(game.previous_product_id)
+        and game.previous_product_id != game.product_id
+        and not game.pending_add
+        and not game.pending_delete
+    ]
+
+
+def _menu_consistency_issues(games: list[GameItem]) -> list[GameItem]:
+    return [
+        game for game in games
+        if game.consistency_warnings
+        and not game.pending_add
+        and not game.pending_delete
+    ]
+
+
+def _consistency_warning_label(code: str) -> str:
+    labels = {
+        "slot_compaction_needed": tr("scan_repair.warning.slot_compaction_needed"),
+        "folder_without_menu_entry": tr("scan_repair.warning.folder_without_menu_entry"),
+        "menu_entry_without_folder": tr("scan_repair.warning.menu_entry_without_folder"),
+        "missing_physical_slot": tr("scan_repair.warning.missing_physical_slot"),
+    }
+    return labels.get(code, code)
+
+
+def _format_consistency_warnings(warnings: list[str]) -> str:
+    return ", ".join(_consistency_warning_label(code) for code in warnings)
+
+
+def _missing_slots_summary(games: list[GameItem]) -> list[int]:
+    slots = {game.slot for game in games if game.slot > 1 and not game.pending_delete}
+    if not slots:
+        return []
+    return sorted(set(range(2, max(slots) + 1)) - slots)
+
+
+class BulkSelectionHeader(QHeaderView):
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        self.setSectionsClickable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def paintSection(self, painter, rect, logical_index):
+        super().paintSection(painter, rect, logical_index)
+        if logical_index != GamesTableModel.C_CHECK:
+            return
+        model = self.model()
+        if not isinstance(model, GamesTableModel) or not model.bulk_mode_active():
+            return
+
+        option = QStyleOptionButton()
+        option.state = QStyle.StateFlag.State_Enabled
+        check_state = model.bulk_header_check_state()
+        if check_state == Qt.CheckState.Checked:
+            option.state |= QStyle.StateFlag.State_On
+        elif check_state == Qt.CheckState.PartiallyChecked:
+            option.state |= QStyle.StateFlag.State_NoChange
+        else:
+            option.state |= QStyle.StateFlag.State_Off
+
+        indicator = self.style().subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, option, self)
+        option.rect = QRect(
+            rect.x() + (rect.width() - indicator.width()) // 2,
+            rect.y() + (rect.height() - indicator.height()) // 2,
+            indicator.width(),
+            indicator.height(),
+        )
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorCheckBox, option, painter, self)
 
 
 class MainWindow(QMainWindow):
@@ -109,9 +193,10 @@ class MainWindow(QMainWindow):
         self.bulk_worker: BulkWorker | None = None
         self.bulk_dialog: BulkProgressDialog | None = None
         self.save_attention_pulse = False
+        self.save_attention_phase = 0
         self.save_attention_timer = QTimer(self)
-        self.save_attention_timer.setInterval(900)
-        self.save_attention_timer.timeout.connect(self._pulse_save_button)
+        self.save_attention_timer.setInterval(240)
+        self.save_attention_timer.timeout.connect(self._pulse_save_buttons)
         self.save_bulk_thread: QThread | None = None
         self.save_bulk_worker: SaveBulkWorker | None = None
         self.update_thread: QThread | None = None
@@ -223,6 +308,7 @@ class MainWindow(QMainWindow):
         self.games_model = GamesTableModel(self)
         self.games_model.checked_changed.connect(lambda slot, checked: self.bulk_checked.__setitem__(slot, checked))
         self.table = QTableView()
+        self.table.setHorizontalHeader(BulkSelectionHeader(Qt.Orientation.Horizontal, self.table))
         self.table.setModel(self.games_model)
         self.table.setItemDelegateForColumn(GamesTableModel.C_COVER, CoverDelegate(self.table))
         self.table.setItemDelegateForColumn(GamesTableModel.C_REGION, RegionBadgeDelegate(self.table))
@@ -255,6 +341,7 @@ class MainWindow(QMainWindow):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.clicked.connect(lambda idx: self.safe_call(lambda: self.handle_table_click(idx.row(), idx.column())))
         self.table.doubleClicked.connect(lambda idx: self.safe_call(lambda: self.open_dialog_for_row(idx.row(), idx.column())))
+        self.table.horizontalHeader().sectionClicked.connect(lambda section: self.safe_call(lambda: self.handle_header_click(section)))
         layout.addWidget(self.table, 1)
 
         bottom = QHBoxLayout()
@@ -331,7 +418,7 @@ class MainWindow(QMainWindow):
         dialog = ProviderSettingsDialog(self.settings, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.settings = load_settings()
-            self.status.setText("Configuracion de fuentes actualizada.")
+            self.status.setText(tr("dialog.provider.updated"))
 
     def rebuild_templates_menu(self):
         self.templates_menu.clear()
@@ -398,19 +485,13 @@ class MainWindow(QMainWindow):
         self.install_template_source(path)
 
     def install_template_from_url(self):
-        url, ok = QInputDialog.getText(self, tr("menu.install_template_url"), "Direct URL to .zip:")
+        url, ok = QInputDialog.getText(self, tr("menu.install_template_url"), tr("template.url_prompt"))
         if not ok or not url.strip():
             return
         self.install_template_source(url.strip())
 
     def install_template_source(self, source: str):
-        answer = QMessageBox.warning(
-            self,
-            APP_NAME,
-            tr("template.trusted_warning"),
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
-        )
-        if answer != QMessageBox.StandardButton.Ok:
+        if not self._confirm_action(tr("template.trusted_warning"), tr("dialog.backup.continue")):
             return
         try:
             package = install_template_package(source, configured_template_dir(self.settings))
@@ -533,13 +614,10 @@ class MainWindow(QMainWindow):
         latest = str(result.get("latest", ""))
         url = str(result.get("url", REPOSITORY_URL))
         if result.get("newer"):
-            answer = QMessageBox.information(
-                self,
-                tr("updates.available.title"),
+            if self._confirm_action(
                 tr("updates.available", current=current, latest=latest, url=url),
-                QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close,
-            )
-            if answer == QMessageBox.StandardButton.Open:
+                tr("updates.open_release"),
+            ):
                 webbrowser.open(url)
         else:
             if self.update_check_notify_current:
@@ -617,6 +695,8 @@ class MainWindow(QMainWindow):
             self.status.setText(diagnostic.reason)
             self.open_setup_wizard(diagnostic)
             return
+        if self._handle_incomplete_slot_transactions():
+            return
         if self._should_suggest_backup(diagnostic):
             self.backup_suggested_roots.add(str(diagnostic.root.resolve()))
             self.stop_busy()
@@ -652,6 +732,43 @@ class MainWindow(QMainWindow):
             on_error=self.scan_error,
         )
 
+    def _handle_incomplete_slot_transactions(self) -> bool:
+        transactions = incomplete_slot_transactions(self.root_path)
+        if not transactions:
+            return False
+        self.stop_busy()
+        tx_dir = transactions[0]
+        message = QMessageBox(self)
+        message.setWindowTitle(APP_NAME)
+        message.setIcon(QMessageBox.Icon.Warning)
+        message.setText(tr("slot_recovery.title"))
+        message.setInformativeText(tr("slot_recovery.body", path=tx_dir))
+        complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+        revert = message.addButton(tr("slot_recovery.revert"), QMessageBox.ButtonRole.DestructiveRole)
+        open_folder = message.addButton(tr("slot_recovery.open_folder"), QMessageBox.ButtonRole.ActionRole)
+        later = message.addButton(tr("slot_recovery.later"), QMessageBox.ButtonRole.RejectRole)
+        message.setDefaultButton(complete)
+        message.exec()
+        clicked = message.clickedButton()
+        service = SdSlotTransactionService(self.root_path, tx_dir.name)
+        try:
+            if clicked is complete:
+                service.complete_from_state()
+                self.status.setText(tr("slot_recovery.completed"))
+                self.start_scan()
+            elif clicked is revert:
+                service.revert_from_state()
+                self.status.setText(tr("slot_recovery.reverted"))
+                self.start_scan()
+            elif clicked is open_folder:
+                webbrowser.open(str(tx_dir))
+                self.status.setText(tr("slot_recovery.pending"))
+            elif clicked is later:
+                self.status.setText(tr("slot_recovery.pending"))
+        except Exception as exc:
+            self.show_error(tr("slot_recovery.failed", message=exc))
+        return True
+
     def diagnostic_error(self, message: str):
         self.write_allowed = False
         self.read_only_reason = message
@@ -668,9 +785,63 @@ class MainWindow(QMainWindow):
             suffix = "" if self.write_allowed else tr("readonly.suffix", reason=self.read_only_reason)
             self.status.setText(tr("scan.finished", count=len(games), path=self.root_path, suffix=suffix))
             self.stop_busy()
+            QTimer.singleShot(0, self._show_scan_repair_prompt)
         except Exception as exc:
             self.stop_busy()
             self.show_error(tr("scan.display_failed", message=exc))
+
+    def _show_scan_repair_prompt(self):
+        corrections = _product_id_corrections(self.games)
+        consistency_issues = _menu_consistency_issues(self.games)
+        missing_slots = _missing_slots_summary(self.games)
+        if not corrections and not consistency_issues and not missing_slots:
+            return
+        lines = []
+        if missing_slots:
+            visible_slots = ", ".join(f"{slot:03d}" for slot in missing_slots[:16])
+            if len(missing_slots) > 16:
+                visible_slots += f", {tr('product_id.more_items', count=len(missing_slots) - 16)}"
+            lines.append(tr("scan_repair.missing_slots", slots=visible_slots))
+            moved_count = len([
+                game for game in consistency_issues
+                if "slot_compaction_needed" in game.consistency_warnings
+            ])
+            if moved_count:
+                lines.append(tr("scan_repair.compaction_consequence", count=moved_count))
+        non_compaction_issues = [
+            game for game in consistency_issues
+            if any(code != "slot_compaction_needed" for code in game.consistency_warnings)
+        ]
+        shown_issue_games = 0
+        for game in non_compaction_issues:
+            warnings = [code for code in game.consistency_warnings if code != "slot_compaction_needed"]
+            if warnings and len(lines) < 12:
+                lines.append(f"{game.slot:03d} - {game.name}: {_format_consistency_warnings(warnings)}")
+                shown_issue_games += 1
+        shown_corrections = 0
+        for game in corrections[:12 - len(lines)]:
+            lines.append(f"{game.slot:03d} - {game.name}: {game.previous_product_id} -> {game.product_id}")
+            shown_corrections += 1
+        hidden = (len(non_compaction_issues) - shown_issue_games) + (len(corrections) - shown_corrections)
+        if hidden > 0:
+            lines.append(tr("product_id.more_items", count=hidden))
+        message = QMessageBox(self)
+        message.setWindowTitle(APP_NAME)
+        message.setIcon(QMessageBox.Icon.Warning)
+        message.setText(tr("scan_repair.prompt_title", count=len(consistency_issues), product_count=len(corrections)))
+        detail = "\n".join(lines)
+        informative = tr("scan_repair.prompt_body")
+        if detail:
+            informative = f"{informative}\n\n{tr('scan_repair.affected_intro')}\n{detail}"
+        message.setInformativeText(informative)
+        save_button = None
+        if self.write_allowed:
+            save_button = message.addButton(tr("scan_repair.save_now"), QMessageBox.ButtonRole.AcceptRole)
+        later_button = message.addButton(tr("scan_repair.later"), QMessageBox.ButtonRole.RejectRole)
+        message.setDefaultButton(save_button or later_button)
+        message.exec()
+        if save_button is not None and message.clickedButton() is save_button:
+            self.save_changes_to_sd(confirm=False)
 
     def scan_error(self, message: str):
         self.stop_busy()
@@ -737,6 +908,11 @@ class MainWindow(QMainWindow):
         game = self.filtered_games[row]
         dialog = CoverPreviewDialog(game, self.bulk_proposals.get(game.slot), self)
         dialog.exec()
+
+    def handle_header_click(self, section: int):
+        if section != GamesTableModel.C_CHECK or not self.bulk_mode:
+            return
+        self.toggle_bulk_header_selection()
 
     def open_dialog(self, game: GameItem):
         dialog = CandidateDialog(game, self, auto_search=True)
@@ -853,13 +1029,10 @@ class MainWindow(QMainWindow):
         if not (game.pending_add and game.is_new) and not self.ensure_write_allowed():
             return
         if game.pending_add and game.is_new:
-            answer = QMessageBox.question(
-                self, APP_NAME,
+            if not self._confirm_action(
                 tr("game.discard_new_title", slot=f"{game.slot:03d}", name=game.name),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
+                tr("action.discard"),
+            ):
                 return
             self.games = [item for item in self.games if item is not game]
             self.games_by_slot.pop(game.slot, None)
@@ -874,13 +1047,10 @@ class MainWindow(QMainWindow):
             self.status.setText(tr("game.delete_unmarked", slot=f"{game.slot:03d}"))
             return
 
-        answer = QMessageBox.question(
-            self, APP_NAME,
+        if not self._confirm_action(
             tr("game.delete_confirm", slot=f"{game.slot:03d}", name=game.name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+            tr("game.mark_delete"),
+        ):
             return
         game.pending_delete = True
         game.save_status = "pendiente_eliminar"
@@ -901,6 +1071,29 @@ class MainWindow(QMainWindow):
             )
         )
 
+    def _pending_apply_counts(self, cover_override: int | None = None) -> dict[str, int]:
+        additions = len([game for game in self.games if game.pending_add])
+        deletions = len([game for game in self.games if game.pending_delete])
+        if cover_override is None:
+            covers = len([
+                game for game in self.games
+                if game.save_status == "pendiente_guardar"
+                and not game.pending_delete
+                and bool(game.selected_image)
+                and Path(game.selected_image).exists()
+                and not game.has_placeholder_cover
+            ])
+        else:
+            covers = cover_override
+        plan = SdSlotTransactionService(self.root_path, "preview").build_plan(self.games)
+        return {
+            "covers": covers,
+            "additions": additions,
+            "deletions": deletions,
+            "slot_moves": len(plan.moves),
+            "product_updates": len(_product_id_corrections(self.games)),
+        }
+
     def _update_save_button_state(self):
         if not hasattr(self, "save_changes_button"):
             return
@@ -916,11 +1109,72 @@ class MainWindow(QMainWindow):
         self.save_changes_button.setProperty("attention", "true" if has_changes else "false")
         if not has_changes:
             self.save_changes_button.setProperty("pulse", "false")
-            self.save_attention_pulse = False
-            self.save_attention_timer.stop()
-        elif not self.save_attention_timer.isActive():
-            self.save_attention_timer.start()
+            self._clear_button_glow(self.save_changes_button)
         self._repolish(self.save_changes_button)
+        self._update_attention_timer()
+
+    def _update_bulk_save_button_attention(self, saveable: int | None = None):
+        if not hasattr(self, "save_bulk_button"):
+            return
+        if saveable is None:
+            saveable = len(valid_cover_proposals(self.bulk_proposals))
+        has_bulk_action = saveable > 0 and self.save_bulk_button.isEnabled()
+        self.save_bulk_button.setProperty("attention", "true" if has_bulk_action else "false")
+        if not has_bulk_action:
+            self.save_bulk_button.setProperty("pulse", "false")
+            self._clear_button_glow(self.save_bulk_button)
+        self._repolish(self.save_bulk_button)
+        self._update_attention_timer()
+
+    def _update_attention_timer(self):
+        has_save_attention = (
+            hasattr(self, "save_changes_button")
+            and self.save_changes_button.property("attention") == "true"
+        )
+        has_bulk_attention = (
+            hasattr(self, "save_bulk_button")
+            and self.save_bulk_button.property("attention") == "true"
+        )
+        if has_save_attention or has_bulk_attention:
+            if not self.save_attention_timer.isActive():
+                self.save_attention_timer.start()
+        else:
+            self.save_attention_pulse = False
+            self.save_attention_phase = 0
+            self.save_attention_timer.stop()
+
+    def _pulse_save_buttons(self):
+        self.save_attention_pulse = not self.save_attention_pulse
+        self.save_attention_phase = (self.save_attention_phase + 1) % 8
+        if hasattr(self, "save_changes_button") and self.save_changes_button.property("attention") == "true":
+            if not self.write_allowed or not self.has_pending_changes():
+                self._update_save_button_state()
+            else:
+                self.save_changes_button.setProperty("pulse", "true" if self.save_attention_pulse else "false")
+                self._apply_button_glow(self.save_changes_button)
+                self._repolish(self.save_changes_button)
+        if hasattr(self, "save_bulk_button") and self.save_bulk_button.property("attention") == "true":
+            if not self.save_bulk_button.isEnabled() or not valid_cover_proposals(self.bulk_proposals):
+                self._update_bulk_save_button_attention(0)
+            else:
+                self.save_bulk_button.setProperty("pulse", "true" if self.save_attention_pulse else "false")
+                self._apply_button_glow(self.save_bulk_button)
+                self._repolish(self.save_bulk_button)
+
+    def _apply_button_glow(self, button: QPushButton):
+        offsets = [(0, -5), (3, -3), (5, 0), (3, 3), (0, 5), (-3, 3), (-5, 0), (-3, -3)]
+        dx, dy = offsets[self.save_attention_phase % len(offsets)]
+        effect = button.graphicsEffect()
+        if not isinstance(effect, QGraphicsDropShadowEffect):
+            effect = QGraphicsDropShadowEffect(button)
+            button.setGraphicsEffect(effect)
+        effect.setBlurRadius(22 if self.save_attention_pulse else 14)
+        effect.setOffset(dx, dy)
+        effect.setColor(QColor(22, 163, 74, 190 if self.save_attention_pulse else 130))
+
+    def _clear_button_glow(self, button: QPushButton):
+        if button.graphicsEffect() is not None:
+            button.setGraphicsEffect(None)
 
     def _pulse_save_button(self):
         if not self.write_allowed or not self.has_pending_changes():
@@ -950,16 +1204,18 @@ class MainWindow(QMainWindow):
         if self.save_thread is not None and self.save_thread.isRunning():
             QMessageBox.information(self, APP_NAME, tr("save.running"))
             return
-        additions = len([game for game in self.games if game.pending_add])
-        deletions = len([game for game in self.games if game.pending_delete])
         if confirm:
-            answer = QMessageBox.question(
-                self, APP_NAME,
-                tr("save.confirm"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
+            counts = self._pending_apply_counts()
+            dialog = ConfirmApplyDialog(
+                self.root_path,
+                counts["covers"],
+                counts["additions"],
+                counts["deletions"],
+                self,
+                slot_moves=counts["slot_moves"],
+                product_updates=counts["product_updates"],
             )
-            if answer != QMessageBox.StandardButton.Yes:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
         self.start_busy(tr("action.save_changes"), str(self.root_path))
         _w = SaveChangesWorker(self.root_path, self.games, self.state, write_allowed=self.write_allowed)
@@ -1011,13 +1267,10 @@ class MainWindow(QMainWindow):
                 return
             if quality.label == "Baja":
                 self.stop_busy()
-                answer = QMessageBox.question(
-                    self, APP_NAME,
+                if not self._confirm_action(
                     tr("cover.low_question", quality=quality.display, warning=quality.warning),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
-                )
-                if answer != QMessageBox.StandardButton.Yes:
+                    tr("cover.use_anyway"),
+                ):
                     return
                 self.start_busy(tr("cover.saving"), game.name)
             normalized_path = self._persist_cover_selection(
@@ -1073,6 +1326,18 @@ class MainWindow(QMainWindow):
             self.status.setText(tr("bulk.disabled"))
         self.apply_filters()
 
+    def toggle_bulk_header_selection(self):
+        if not self.bulk_mode:
+            return
+        select_all = not all(self.bulk_checked.get(game.slot, False) for game in self.games)
+        self.bulk_checked = _bulk_selection_map(self.games, select_all)
+        self.games_model.set_bulk_mode(True, self.bulk_checked)
+        self.apply_filters()
+        if select_all:
+            self.status.setText(tr("bulk.selected_all", count=len(self.games)))
+        else:
+            self.status.setText(tr("bulk.selected_none"))
+
     def start_bulk_search(self):
         if not self.bulk_mode:
             self.toggle_bulk_mode()
@@ -1122,17 +1387,27 @@ class MainWindow(QMainWindow):
             self.bulk_button.setEnabled(True)
             self.bulk_mode_button.setEnabled(True)
             self.scan_button.setEnabled(True)
-            self.save_bulk_button.setEnabled(has_saveable_proposal(self.bulk_proposals))
+            saveable = len(valid_cover_proposals(self.bulk_proposals))
+            self.save_bulk_button.setEnabled(saveable > 0)
+            if saveable:
+                self.save_bulk_button.setToolTip(tr("bulk.save_ready_tooltip", count=saveable))
+                self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
+            else:
+                self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
+                self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
+            self._update_bulk_save_button_attention(saveable)
             self.discard_bulk_button.setEnabled(bool(self.bulk_proposals))
             self.apply_filters()
+            summary_key = "bulk.summary_apply" if saveable else "bulk.summary"
             self.status.setText(
                 tr(
-                    "bulk.summary",
+                    summary_key,
                     processed=summary["processed"],
                     auto=summary["auto"],
                     review=summary["review"],
                     skipped=summary["skipped"],
                     errors=summary["errors"],
+                    saveable=saveable,
                 )
             )
         except Exception as exc:
@@ -1145,7 +1420,9 @@ class MainWindow(QMainWindow):
         self.bulk_button.setEnabled(True)
         self.bulk_mode_button.setEnabled(True)
         self.scan_button.setEnabled(True)
-        self.save_bulk_button.setEnabled(bool(self.bulk_proposals))
+        saveable = len(valid_cover_proposals(self.bulk_proposals))
+        self.save_bulk_button.setEnabled(saveable > 0)
+        self._update_bulk_save_button_attention(saveable)
         self.discard_bulk_button.setEnabled(bool(self.bulk_proposals))
         self.show_error(message)
 
@@ -1161,9 +1438,16 @@ class MainWindow(QMainWindow):
         items = [(g, p) for g, p in items if g is not None]
         if not items:
             return
-        additions = len([game for game in self.games if game.pending_add])
-        deletions = len([game for game in self.games if game.pending_delete])
-        dialog = ConfirmApplyDialog(self.root_path, len(items), additions, deletions, self)
+        counts = self._pending_apply_counts(cover_override=len(items))
+        dialog = ConfirmApplyDialog(
+            self.root_path,
+            counts["covers"],
+            counts["additions"],
+            counts["deletions"],
+            self,
+            slot_moves=counts["slot_moves"],
+            product_updates=counts["product_updates"],
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self.apply_after_bulk_save = True
@@ -1210,6 +1494,9 @@ class MainWindow(QMainWindow):
                 saved += 1
             self.bulk_proposals.clear()
             self.save_bulk_button.setEnabled(False)
+            self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
+            self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
+            self._update_bulk_save_button_attention(0)
             self.discard_bulk_button.setEnabled(False)
             self.apply_filters()
             export_reports(self.games, REPORT_TSV, REPORT_JSON)
@@ -1244,6 +1531,9 @@ class MainWindow(QMainWindow):
         count = len(self.bulk_proposals)
         self.bulk_proposals.clear()
         self.save_bulk_button.setEnabled(False)
+        self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
+        self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
+        self._update_bulk_save_button_attention(0)
         self.discard_bulk_button.setEnabled(False)
         self.apply_filters()
         self.status.setText(tr("bulk.discarded", count=count))
@@ -1277,6 +1567,17 @@ class MainWindow(QMainWindow):
         log.error("UI error: %s", message, exc_info=True)
         self.status.setText(tr("app.error", message=message))
         QMessageBox.warning(self, APP_NAME, message)
+
+    def _confirm_action(self, message_text: str, accept_text: str) -> bool:
+        message = QMessageBox(self)
+        message.setWindowTitle(APP_NAME)
+        message.setIcon(QMessageBox.Icon.Question)
+        message.setText(message_text)
+        accept_button = message.addButton(accept_text, QMessageBox.ButtonRole.AcceptRole)
+        cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
+        message.setDefaultButton(cancel_button)
+        message.exec()
+        return message.clickedButton() is accept_button
 
     def open_path(self, path: Path):
         if not Path(path).exists():
@@ -1330,7 +1631,10 @@ class MainWindow(QMainWindow):
         root_key = str(diagnostic.root.resolve())
         if root_key in self.backup_suggested_roots:
             return False
-        if backup_decision(self.settings, diagnostic) is not None:
+        if registered_backup_exists(diagnostic.root):
+            return False
+        decision = backup_decision(self.settings, diagnostic)
+        if decision and decision.get("decision") == "skipped":
             return False
         return True
 
@@ -1362,6 +1666,7 @@ class MainWindow(QMainWindow):
                     btn.setEnabled(has_saveable_proposal(self.bulk_proposals))
                 elif mode == "bulk_any":
                     btn.setEnabled(bool(self.bulk_proposals))
+        self._update_bulk_save_button_attention()
         self._update_save_button_state()
 
     def change_template(self, template_name: str):

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -36,6 +36,9 @@ class GameItem:
     pending_add: bool = False
     has_placeholder_cover: bool = False
     save_status: str = ""
+    artwork_serials: list[str] = field(default_factory=list)
+    previous_product_id: str = ""
+    consistency_warnings: list[str] = field(default_factory=list)
 
 
 @dataclass

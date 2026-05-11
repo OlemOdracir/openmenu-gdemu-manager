@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...core.models import BulkProposal, GameItem
+from ...i18n import tr, translate_status
 from ..image_qt import file_to_pixmap, fit_pixmap, pil_to_pixmap
 from ..icons import action_qicon
 from ..widgets import apply_interactive_cursor, chip_label, region_to_flag
@@ -38,12 +39,12 @@ class CoverPreviewDialog(QDialog):
         title = QLabel(self.game.name)
         title.setObjectName("WizardTitle")
         title.setWordWrap(True)
-        subtitle = QLabel(f"Slot {self.game.slot:03d} | Product ID {self.game.product_id or '-'}")
+        subtitle = QLabel(tr("dialog.cover_preview.subtitle", slot=f"{self.game.slot:03d}", product=self.game.product_id or "-"))
         subtitle.setObjectName("WizardSubtitle")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
         header.addLayout(title_box, 1)
-        header.addWidget(chip_label(f"Region {region_to_flag(self.game.region)}", "accent"))
+        header.addWidget(chip_label(tr("dialog.cover_preview.region", region=region_to_flag(self.game.region)), "accent"))
         if self.game.status:
             header.addWidget(chip_label(self._friendly_status(), self._status_chip_kind()))
         root.addLayout(header)
@@ -79,7 +80,7 @@ class CoverPreviewDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        close = QPushButton("Cerrar")
+        close = QPushButton(tr("action.close"))
         close.setIcon(action_qicon("close", "default", 22))
         close.setIconSize(QSize(20, 20))
         close.setMinimumHeight(42)
@@ -103,7 +104,7 @@ class CoverPreviewDialog(QDialog):
             except Exception:
                 pixmap = None
         if pixmap is None or pixmap.isNull():
-            self.image_label.setText("Sin imagen disponible")
+            self.image_label.setText(tr("dialog.cover_preview.no_image"))
             return
         self.image_label.setPixmap(fit_pixmap(pixmap, 680, 560))
 
@@ -124,27 +125,27 @@ class CoverPreviewDialog(QDialog):
             if self.proposal.candidate is not None:
                 source = self.proposal.candidate.source
         return [
-            ("Estado", self._friendly_status()),
-            ("Calidad", quality),
-            ("Score", score),
-            ("Tamano", image_size),
-            ("Fuente", source),
+            (tr("table.status"), self._friendly_status()),
+            (tr("table.quality"), quality),
+            (tr("dialog.cover_preview.score"), score),
+            (tr("dialog.cover_preview.size"), image_size),
+            (tr("dialog.cover_preview.source"), source),
         ]
 
     def _friendly_status(self) -> str:
         values = {
-            "seleccionada": "Seleccionada",
-            "correcta": "Correcta",
-            "faltante": "Falta caratula",
-            "no_revisada": "No revisada",
-            "dudosa": "Revisar",
+            "seleccionada": translate_status("seleccionada"),
+            "correcta": translate_status("correcta"),
+            "faltante": translate_status("faltante"),
+            "no_revisada": translate_status("no_revisada"),
+            "dudosa": translate_status("revision"),
         }
         if self.game.pending_add:
-            return "Pendiente de guardar"
+            return translate_status("pendiente_guardar")
         if self.game.pending_delete:
-            return "Pendiente de eliminar"
+            return translate_status("pendiente_eliminar")
         if self.game.has_placeholder_cover:
-            return "Falta caratula"
+            return translate_status("faltante")
         return values.get(self.game.status, self.game.status or "-")
 
     def _status_chip_kind(self) -> str:

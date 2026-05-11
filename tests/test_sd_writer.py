@@ -28,6 +28,16 @@ def test_build_openmenu_text_contains_slot_entries():
     assert "02.product=MK-51000" in text
 
 
+def test_build_openmenu_text_supports_three_digit_slots():
+    games = [GameItem(slot=100, name="Doom Online DC", product_id="DOOMONLINE", region="JUE")]
+
+    text = build_openmenu_text(games)
+
+    assert "num_items=1" in text
+    assert "100.name=Doom Online DC" in text
+    assert "100.product=DOOMONLINE" in text
+
+
 def test_validate_track05_menu_capacity_fails_before_patch(tmp_path):
     track = tmp_path / "track05.iso"
     track.write_bytes(b"prefix[OPENMENU]\nold=1\n" + (b"\x00" * 64) + b"suffix")

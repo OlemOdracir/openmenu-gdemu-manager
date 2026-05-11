@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 APP_DIR_NAME = "OpenMenu GDEMU Manager"
+PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+BUNDLED_BUILDGDI_PATH = PACKAGE_ROOT / "third_party" / "buildgdi" / "buildgdi.exe"
 
 
 def _runtime_root() -> Path:

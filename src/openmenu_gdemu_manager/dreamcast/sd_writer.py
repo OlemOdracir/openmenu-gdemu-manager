@@ -6,9 +6,8 @@ import struct
 from pathlib import Path
 from typing import Callable
 
-from PIL import Image
-
 from ..core.matching import normalize
+from .pvr import image_to_pvr
 from .metadata import parse_openmenu_ini
 from ..core.models import GameItem
 from ..config.paths import DEFAULT_INI
@@ -29,7 +28,7 @@ DEFAULT_MENU_ENTRY = {
     "disc": "1/1",
     "vga": "1",
     "region": "JUE",
-    "version": "V0.1.0",
+    "version": "V0.1.1",
     "date": "20210609",
     "product": "NEODC_1",
 }
@@ -210,28 +209,7 @@ def patch_track05_cover(track_path: Path, cover_index: int, image_path: Path) ->
 
 
 def png_to_pvr(png_path: Path) -> bytes:
-    image = Image.open(png_path).convert("RGB")
-    image = image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    bits = WIDTH.bit_length() - 1
-    pixel_data = bytearray(WIDTH * HEIGHT * 2)
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            r, g, b = image.getpixel((x, y))
-            rgb565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
-            z = xy_to_morton(x, y, bits)
-            struct.pack_into("<H", pixel_data, z * 2, rgb565)
-    header = (
-        b"GBIX"
-        + struct.pack("<I", GBIX_SIZE)
-        + struct.pack("<I", GBIX_GBIX_VALUE)
-        + GBIX_PAD
-        + b"PVRT"
-        + struct.pack("<I", PVRT_DATA_SIZE)
-        + struct.pack("<BB", PX_FORMAT, DATA_TYPE)
-        + b"\x00\x00"
-        + struct.pack("<HH", WIDTH, HEIGHT)
-    )
-    return header + bytes(pixel_data)
+    return image_to_pvr(png_path, WIDTH, HEIGHT)
 
 
 def xy_to_morton(x: int, y: int, bits: int) -> int:

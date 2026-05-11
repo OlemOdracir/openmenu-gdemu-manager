@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from ..image_qt import file_to_pixmap, pil_to_pixmap
 from ...core.models import BulkProposal, GameItem
 from ...config.settings import load_settings, ui_settings
+from ...i18n import tr
 from ..theme import template_palette
 
 log = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ class BusyOverlay(QWidget):
         layout.setContentsMargins(22, 18, 22, 18)
         self.spinner = SpinnerLabel(self.panel)
         layout.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignHCenter)
-        self.title = QLabel("Procesando...")
+        self.title = QLabel(tr("busy.processing"))
         self.title.setObjectName("BusyTitle")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.title)

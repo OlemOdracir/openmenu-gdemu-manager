@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmenu-gdemu-manager"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local Windows manager for Dreamcast OpenMenu/GDEMU games and covers."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -50,6 +50,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 openmenu_gdemu_manager = ["resources/app/*.ico", "resources/app/*.png", "resources/i18n/*.json", "resources/icons/*.svg", "resources/illustrations/*.png", "resources/vendor/tabler/*.svg", "resources/vendor/tabler/LICENSE"]
+
+[tool.setuptools.data-files]
+"third_party/buildgdi" = ["third_party/buildgdi/buildgdi.exe", "third_party/buildgdi/LICENSE-DiscUtilsGD.txt", "third_party/buildgdi/README.md", "third_party/buildgdi/SHA256SUMS.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

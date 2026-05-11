@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import urllib.parse
 import webbrowser
 from pathlib import Path
@@ -33,6 +34,7 @@ from ...core.image_quality import analyze_image
 from ...core.models import Candidate, GameItem
 from ...covers.search import load_candidate_image
 from ...covers.providers.registry import source_provider_id
+from ...config.paths import INBOX_ORIGINALS_DIR
 from ...config.settings import load_settings, web_search_templates
 from ...i18n import tr, translate_status
 from ..theme import template_palette
@@ -348,7 +350,7 @@ class CandidateDetailDialog(QDialog):
 
         if c.duplicate_sources:
             col = QVBoxLayout()
-            n = QLabel("También en")
+            n = QLabel(tr("dialog.candidate.also_in_label"))
             n.setObjectName("MutedLabel")
             v = QLabel(", ".join(c.duplicate_sources))
             v.setObjectName("TileTitle")
@@ -503,6 +505,15 @@ class CandidateDialog(QDialog):
         self.local_button.clicked.connect(lambda: self.safe_call(self.pick_local))
         search_row.addWidget(self.local_button)
 
+        self.inbox_button = action_button(
+            self,
+            "inbox",
+            tr("dialog.candidate.open_inbox_tip"),
+            label=tr("dialog.candidate.inbox"),
+        )
+        self.inbox_button.clicked.connect(lambda: self.safe_call(self.open_cover_inbox))
+        search_row.addWidget(self.inbox_button)
+
         self.web_button = action_button(self, "web", tr("dialog.candidate.web_tip"), label="Web")
         self.web_button.clicked.connect(lambda: self.safe_call(self.open_web_search))
         search_row.addWidget(self.web_button)
@@ -592,7 +603,7 @@ class CandidateDialog(QDialog):
         return f"{quality.width}x{quality.height}", f"{quality.label} ({quality.score})"
 
     def _set_search_busy(self, busy: bool, message: str = ""):
-        for btn in (self.search_button, self.save_name_button, self.local_button, self.web_button):
+        for btn in (self.search_button, self.save_name_button, self.local_button, self.inbox_button, self.web_button):
             btn.setEnabled(not busy)
         self.loading.setVisible(busy)
         if busy:
@@ -728,7 +739,7 @@ class CandidateDialog(QDialog):
         QTimer.singleShot(180, lambda: self._select_after_feedback(candidate))
 
     def _set_controls_enabled(self, enabled: bool):
-        for btn in (self.search_button, self.save_name_button, self.local_button, self.web_button, self.prev_button, self.next_button):
+        for btn in (self.search_button, self.save_name_button, self.local_button, self.inbox_button, self.web_button, self.prev_button, self.next_button):
             btn.setEnabled(enabled)
 
     def _select_after_feedback(self, candidate: Candidate):
@@ -813,6 +824,21 @@ class CandidateDialog(QDialog):
         self.selected.emit(candidate, image)
         self.accept()
 
+    def open_cover_inbox(self):
+        INBOX_ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(INBOX_ORIGINALS_DIR))
+        examples = ", ".join(self._cover_inbox_filename_examples())
+        self.status.setText(tr("dialog.candidate.inbox_opened", path=INBOX_ORIGINALS_DIR, examples=examples))
+
+    def _cover_inbox_filename_examples(self) -> list[str]:
+        safe_name = _safe_cover_filename(self.query.text().strip() or self.game.name)
+        examples = [f"{safe_name}.jpg"]
+        product = _safe_cover_filename(self.game.product_id or "")
+        if product:
+            examples.append(f"{product}_{safe_name}.jpg")
+        examples.append(f"{self.game.slot:03d}_{safe_name}.png")
+        return examples
+
     def open_source(self, candidate: Candidate):
         if candidate.source_url:
             webbrowser.open(candidate.source_url)
@@ -852,3 +878,9 @@ class CandidateDialog(QDialog):
             log.exception("Dialog callback failed")
             QMessageBox.warning(self, APP_NAME, tr("error.generic", message=exc))
             self.status.setText(tr("app.error", message=exc))
+
+
+def _safe_cover_filename(value: str) -> str:
+    text = re.sub(r"[<>:\"/\\|?*]+", " ", str(value or "")).strip()
+    text = re.sub(r"\s+", " ", text)
+    return text or "cover"

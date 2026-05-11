@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from openmenu_gdemu_manager.dreamcast.storage_diagnostics import RouteSummary, StorageDiagnostic
+from openmenu_gdemu_manager.i18n import active_language, set_language
 from openmenu_gdemu_manager.ui.dialogs.setup_wizard import (
     _diagnostic_tiles,
     _drive_type_label,
@@ -10,6 +13,14 @@ from openmenu_gdemu_manager.ui.dialogs.setup_wizard import (
     _route_class_label,
 )
 from openmenu_gdemu_manager.ui.theme import build_stylesheet
+
+
+@pytest.fixture(autouse=True)
+def _spanish_language():
+    previous = active_language()
+    set_language("es")
+    yield
+    set_language(previous)
 
 
 def _diagnostic(
@@ -68,7 +79,7 @@ def test_diagnostic_labels_are_human_readable():
     assert _route_class_label("dangerous_path") == "Ruta bloqueada"
     assert _health_label("ok") == "Correcta"
     assert _menu_label("unknown") == "No detectado"
-    assert _drive_type_label("removable") == "Unidad extraible"
+    assert _drive_type_label("removable") == "Unidad extraíble"
 
 
 def test_details_format_uses_bold_labels_and_code_values():

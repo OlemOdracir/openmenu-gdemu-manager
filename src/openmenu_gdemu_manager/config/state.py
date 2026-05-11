@@ -55,7 +55,7 @@ def apply_state(game: GameItem, state: dict, root: Path) -> None:
         game.image_width = int(data.get("image_width", 0) or 0)
         game.image_height = int(data.get("image_height", 0) or 0)
         game.normalization_mode = data.get("normalization_mode", "")
-    if game.selected_image:
+    if game.selected_image and game.current_cover is None:
         selected_path = Path(game.selected_image)
         if selected_path.exists():
             game.current_cover = selected_path
@@ -92,8 +92,9 @@ def _state_matches_game(game: GameItem, data: dict) -> bool:
         return True
     saved_product = normalize_product(data.get("product_id", ""))
     scanned_product = normalize_product(game.product_id)
+    scanned_aliases = {normalize_product(alias) for alias in game.artwork_serials}
     if saved_product and scanned_product and saved_product != scanned_product:
-        return False
+        return saved_product in scanned_aliases
     saved_name = (data.get("name") or "").strip()
     if not saved_product and scanned_product and saved_name and game.name:
         return score_candidate(game.name, saved_name) >= 75

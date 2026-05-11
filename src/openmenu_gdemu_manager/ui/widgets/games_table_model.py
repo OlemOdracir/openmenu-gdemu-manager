@@ -50,7 +50,11 @@ class GamesTableModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+            if section == self.C_CHECK and self._bulk_mode:
+                return ""
             return tr(self.HEADER_KEYS[section])
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.ToolTipRole and section == self.C_CHECK:
+            return "Seleccionar/deseleccionar todos"
         return None
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
@@ -82,6 +86,7 @@ class GamesTableModel(QAbstractTableModel):
             checked = value == Qt.CheckState.Checked.value
             self._bulk_checked[slot] = checked
             self.dataChanged.emit(index, index, [role])
+            self.headerDataChanged.emit(Qt.Orientation.Horizontal, self.C_CHECK, self.C_CHECK)
             self.checked_changed.emit(slot, checked)
             return True
         return False
@@ -103,6 +108,7 @@ class GamesTableModel(QAbstractTableModel):
             self._bulk_checked = dict(checked)
         if self._games:
             self.dataChanged.emit(self.index(0, self.C_CHECK), self.index(self.rowCount() - 1, self.C_CHECK))
+        self.headerDataChanged.emit(Qt.Orientation.Horizontal, self.C_CHECK, self.C_CHECK)
 
     def set_proposals(self, proposals: dict[int, BulkProposal]):
         self._proposals = proposals
@@ -255,6 +261,19 @@ class GamesTableModel(QAbstractTableModel):
                     return None
             return self._pixmap_cache[key]
         return None
+
+    def bulk_mode_active(self) -> bool:
+        return self._bulk_mode
+
+    def bulk_header_check_state(self) -> Qt.CheckState:
+        if not self._games:
+            return Qt.CheckState.Unchecked
+        checked = [bool(self._bulk_checked.get(game.slot, False)) for game in self._games]
+        if all(checked):
+            return Qt.CheckState.Checked
+        if any(checked):
+            return Qt.CheckState.PartiallyChecked
+        return Qt.CheckState.Unchecked
 
 
 def _status_tooltip(status: str) -> str:

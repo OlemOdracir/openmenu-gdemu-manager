@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from ...i18n import LanguagePackage
+from ...i18n import LanguagePackage, tr
 from ..icons import app_logo_pixmap
 
 
@@ -12,7 +12,7 @@ class LanguageSelectionDialog(QDialog):
         super().__init__(parent)
         self.languages = sorted(languages, key=lambda item: (item.code != "en", item.label.lower()))
         self.selected_code = "en"
-        self.setWindowTitle("Choose language")
+        self.setWindowTitle(tr("dialog.language.title"))
         self.setModal(True)
         self.resize(520, 260)
         self._build_ui()
@@ -29,12 +29,9 @@ class LanguageSelectionDialog(QDialog):
         header.addWidget(logo)
 
         text = QVBoxLayout()
-        title = QLabel("Choose language")
+        title = QLabel(tr("dialog.language.heading"))
         title.setObjectName("WizardTitle")
-        message = QLabel(
-            "Select the language for OpenMenu GDEMU Manager. "
-            "You can change it later from the Language menu."
-        )
+        message = QLabel(tr("dialog.language.message"))
         message.setObjectName("WizardSubtitle")
         message.setWordWrap(True)
         text.addWidget(title)
@@ -52,11 +49,11 @@ class LanguageSelectionDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        cancel = QPushButton("Cancel")
+        cancel = QPushButton(tr("action.cancel"))
         cancel.clicked.connect(self.reject)
         cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         buttons.addWidget(cancel)
-        use = QPushButton("Use selected language")
+        use = QPushButton(tr("dialog.language.use"))
         use.setProperty("variant", "success")
         use.clicked.connect(self.accept)
         use.setCursor(Qt.CursorShape.PointingHandCursor)

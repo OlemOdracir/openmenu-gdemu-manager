@@ -27,6 +27,7 @@ from ...services.backup_service import (
     set_backup_decision,
     suggested_backup_dir,
 )
+from ...services.sd_registry import write_backup_registry
 from ..icons import illustration_pixmap, sd_card_qicon, vendor_qicon
 
 log = logging.getLogger(__name__)
@@ -187,23 +188,15 @@ class BackupPromptDialog(QDialog):
 
     def start_backup(self):
         if self.destination.exists() and any(self.destination.iterdir()):
-            answer = QMessageBox.warning(
+            if not _confirm_message(
                 self,
-                APP_NAME,
                 tr("dialog.backup.folder_confirm", path=self.destination),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
+            ):
                 return
-        answer = QMessageBox.warning(
+        if not _confirm_message(
             self,
-            APP_NAME,
             tr("dialog.backup.confirm", path=self.destination),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+        ):
             return
         self._set_busy(True, tr("dialog.backup.preparing"))
         self.backup_worker = BackupWorker(self.diagnostic.root, self.destination)
@@ -227,6 +220,7 @@ class BackupPromptDialog(QDialog):
     def backup_finished(self, destination: str):
         self._set_busy(False, tr("dialog.backup.done", path=destination))
         self.settings = set_backup_decision(self.settings, self.diagnostic, "backed_up", Path(destination))
+        write_backup_registry(self.diagnostic.root, Path(destination))
         save_settings(self.settings)
         QMessageBox.information(self, APP_NAME, tr("dialog.backup.done_detail", path=destination))
         self.accept()
@@ -236,14 +230,7 @@ class BackupPromptDialog(QDialog):
         QMessageBox.warning(self, APP_NAME, tr("dialog.backup.failed", message=message))
 
     def skip_backup(self):
-        answer = QMessageBox.warning(
-            self,
-            APP_NAME,
-            tr("dialog.backup.skip_confirm"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not _confirm_message(self, tr("dialog.backup.skip_confirm")):
             return
         self.settings = set_backup_decision(self.settings, self.diagnostic, "skipped")
         save_settings(self.settings)
@@ -268,6 +255,18 @@ def _button(text: str, icon_name: str, variant: str) -> QPushButton:
     button.setProperty("variant", variant)
     button.setCursor(Qt.CursorShape.PointingHandCursor)
     return button
+
+
+def _confirm_message(parent: QWidget, text: str) -> bool:
+    message = QMessageBox(parent)
+    message.setWindowTitle(APP_NAME)
+    message.setIcon(QMessageBox.Icon.Information)
+    message.setText(text)
+    continue_button = message.addButton(tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
+    cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
+    message.setDefaultButton(cancel_button)
+    message.exec()
+    return message.clickedButton() is continue_button
 
 
 def _add_path_row(grid: QGridLayout, row: int, icon_pixmap, label_text: str, value_text: str) -> QLabel:

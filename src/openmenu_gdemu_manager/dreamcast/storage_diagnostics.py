@@ -4,6 +4,8 @@ import ctypes
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .metadata import find_openmenu_track
+
 
 ROUTE_EMPTY_SAFE = "empty_safe"
 ROUTE_GDEMU_STRUCTURE = "gdemu_structure"
@@ -24,6 +26,7 @@ MENU_NO_MENU = "no_menu"
 MENU_UNKNOWN = "unknown"
 
 IGNORED_EMPTY_NAMES = {
+    "_openmenu_gdemu_manager",
     "system volume information",
     "$recycle.bin",
     "desktop.ini",
@@ -133,9 +136,9 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
 
     if has_gdemu_dirs:
         menu = detect_menu(root)
-        if menu.detail.startswith("No se pudo leer track05.iso"):
+        if menu.detail.startswith("No se pudo leer el track openMenu"):
             return _diagnostic(root, ROUTE_GDEMU_STRUCTURE, HEALTH_POSSIBLE_CORRUPTION, menu.state, False, False,
-                               "No se pudo leer track05.iso. La app no intentara reparar ni escribir.",
+                               "No se pudo leer el track openMenu. La app no intentara reparar ni escribir.",
                                warnings, summary, menu)
         if len(non_numeric) > 20:
             return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, menu.state, False, False,
@@ -166,13 +169,13 @@ def detect_menu(root: Path) -> MenuDiagnostic:
     slot1 = Path(root) / "01"
     if not slot1.exists():
         return MenuDiagnostic(MENU_NO_MENU, "No existe slot 01.")
-    track05 = slot1 / "track05.iso"
-    if track05.exists():
+    menu_track = find_openmenu_track(root)
+    if menu_track.exists():
         try:
-            with track05.open("rb") as handle:
+            with menu_track.open("rb") as handle:
                 chunk = handle.read()
         except OSError as exc:
-            return MenuDiagnostic(MENU_UNKNOWN, f"No se pudo leer track05.iso: {exc}")
+            return MenuDiagnostic(MENU_UNKNOWN, f"No se pudo leer el track openMenu: {exc}")
         if b"[OPENMENU]" in chunk:
             if b"NEODC_1" in chunk or b"openMenu" in chunk or b"OpenMenu" in chunk:
                 return MenuDiagnostic(MENU_OPENMENU_COMPATIBLE, "Bloque [OPENMENU] detectado.")

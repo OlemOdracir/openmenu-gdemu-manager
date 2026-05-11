@@ -19,6 +19,7 @@ def test_diagnose_storage_empty_path_can_be_prepared(tmp_path):
 def test_diagnose_storage_ignores_os_metadata_for_empty_path(tmp_path):
     (tmp_path / "WPSettings.dat").write_text("", encoding="utf-8")
     (tmp_path / "System Volume Information").mkdir()
+    (tmp_path / "_openmenu_gdemu_manager").mkdir()
 
     diagnostic = diagnose_storage(tmp_path)
 
@@ -26,6 +27,7 @@ def test_diagnose_storage_ignores_os_metadata_for_empty_path(tmp_path):
     assert diagnostic.prepare_allowed is True
     assert diagnostic.summary.other_entries == []
     assert sorted(name.lower() for name in diagnostic.summary.ignored_entries) == [
+        "_openmenu_gdemu_manager",
         "system volume information",
         "wpsettings.dat",
     ]
@@ -56,6 +58,46 @@ def test_diagnose_storage_accepts_local_openmenu_backup(tmp_path):
     slot1 = tmp_path / "01"
     slot1.mkdir()
     (slot1 / "track05.iso").write_bytes(b"prefix [OPENMENU] openMenu NEODC_1 suffix")
+
+    diagnostic = diagnose_storage(tmp_path)
+
+    assert diagnostic.scan_allowed is True
+    assert diagnostic.write_allowed is True
+    assert diagnostic.menu_state == MENU_OPENMENU_COMPATIBLE
+
+
+def test_diagnose_storage_ignores_sd_registry_with_gdemu_structure(tmp_path):
+    slot1 = tmp_path / "01"
+    slot1.mkdir()
+    (slot1 / "track05.iso").write_bytes(b"prefix [OPENMENU] openMenu NEODC_1 suffix")
+    (tmp_path / "_openmenu_gdemu_manager").mkdir()
+
+    diagnostic = diagnose_storage(tmp_path)
+
+    assert diagnostic.scan_allowed is True
+    assert diagnostic.write_allowed is True
+    assert "_openmenu_gdemu_manager" in diagnostic.summary.ignored_entries
+    assert "_openmenu_gdemu_manager" not in diagnostic.summary.other_entries
+
+
+def test_diagnose_storage_detects_rebuilt_openmenu_track05_bin(tmp_path):
+    slot1 = tmp_path / "01"
+    slot1.mkdir()
+    (slot1 / "disc.gdi").write_text(
+        "\n".join(
+            [
+                "5",
+                "1 0 4 2048 track01.iso 0",
+                "2 450 0 2352 track02.raw 0",
+                "3 45000 4 2048 track03.bin 0",
+                "4 487657 0 2352 track04.raw 0",
+                "5 487808 4 2048 track05.bin 0",
+            ]
+        ),
+        encoding="ascii",
+    )
+    (slot1 / "track03.bin").write_bytes(b"boot")
+    (slot1 / "track05.bin").write_bytes(b"prefix [OPENMENU] openMenu NEODC_1 suffix")
 
     diagnostic = diagnose_storage(tmp_path)
 

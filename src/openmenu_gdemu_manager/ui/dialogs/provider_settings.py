@@ -24,15 +24,24 @@ from PySide6.QtWidgets import (
 
 from ...config.settings import save_settings
 from ...covers.providers.registry import provider_definitions, test_provider
+from ...i18n import tr
 from ..widgets import apply_interactive_cursor
 
 
 class ProviderSettingsDialog(QDialog):
-    HEADERS = ["Activo", "Nombre", "Estado", "Prioridad", "Configurar", "Probar", "Registrarse"]
+    HEADER_KEYS = [
+        "dialog.provider.active",
+        "dialog.provider.name",
+        "table.status",
+        "dialog.provider.priority",
+        "dialog.provider.configure",
+        "dialog.provider.test",
+        "dialog.provider.signup",
+    ]
 
     def __init__(self, settings: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Fuentes online")
+        self.setWindowTitle(tr("dialog.provider.title"))
         self.resize(1120, 540)
         self.settings = copy.deepcopy(settings)
         self.definitions = provider_definitions()
@@ -44,15 +53,12 @@ class ProviderSettingsDialog(QDialog):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        intro = QLabel(
-            "Activa fuentes de caratulas. La fuente recomendada no requiere cuenta; "
-            "las fuentes avanzadas pueden requerir credenciales propias."
-        )
+        intro = QLabel(tr("dialog.provider.intro"))
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        self.table = QTableWidget(len(self.definitions), len(self.HEADERS), self)
-        self.table.setHorizontalHeaderLabels(self.HEADERS)
+        self.table = QTableWidget(len(self.definitions), len(self.HEADER_KEYS), self)
+        self.table.setHorizontalHeaderLabels([tr(key) for key in self.HEADER_KEYS])
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
         self.table.setMinimumHeight(360)
@@ -90,21 +96,21 @@ class ProviderSettingsDialog(QDialog):
             self.priority_widgets[provider_id] = priority
             self.table.setCellWidget(row, 3, priority)
 
-            config_btn = QPushButton("Configurar")
+            config_btn = QPushButton(tr("dialog.provider.configure"))
             config_btn.setMinimumWidth(112)
             config_btn.setEnabled(definition.configurable and not definition.coming_soon)
             apply_interactive_cursor(config_btn)
             config_btn.clicked.connect(lambda _=False, pid=provider_id: self._configure(pid))
             self.table.setCellWidget(row, 4, config_btn)
 
-            test_btn = QPushButton("Probar")
+            test_btn = QPushButton(tr("dialog.provider.test"))
             test_btn.setMinimumWidth(92)
             test_btn.setEnabled(not definition.coming_soon)
             apply_interactive_cursor(test_btn)
             test_btn.clicked.connect(lambda _=False, pid=provider_id: self._test(pid))
             self.table.setCellWidget(row, 5, test_btn)
 
-            signup_btn = QPushButton("Registrarse")
+            signup_btn = QPushButton(tr("dialog.provider.signup"))
             signup_btn.setMinimumWidth(112)
             signup_btn.setEnabled(bool(definition.signup_url) and not definition.coming_soon)
             apply_interactive_cursor(signup_btn)
@@ -114,8 +120,8 @@ class ProviderSettingsDialog(QDialog):
         self._apply_table_layout()
 
         buttons = QDialogButtonBox()
-        save_button = buttons.addButton("Guardar", QDialogButtonBox.ButtonRole.AcceptRole)
-        cancel_button = buttons.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        save_button = buttons.addButton(tr("action.save"), QDialogButtonBox.ButtonRole.AcceptRole)
+        cancel_button = buttons.addButton(tr("action.cancel"), QDialogButtonBox.ButtonRole.RejectRole)
         save_button.setMinimumWidth(110)
         cancel_button.setMinimumWidth(110)
         apply_interactive_cursor(save_button)
@@ -152,13 +158,13 @@ class ProviderSettingsDialog(QDialog):
         definition = self.definitions[provider_id]
         if not cfg.get("enabled", False):
             if definition.coming_soon:
-                return "proximamente"
-            return "apagado"
+                return tr("dialog.provider.status.coming_soon")
+            return tr("dialog.provider.status.disabled")
         if definition.find is None:
-            return "reservado"
+            return tr("dialog.provider.status.reserved")
         if definition.requires_credentials and not _has_credentials(provider_id, cfg):
-            return "credenciales incompletas"
-        return "activo"
+            return tr("dialog.provider.status.missing_credentials")
+        return tr("dialog.provider.status.active")
 
     def _configure(self, provider_id: str):
         dialog = ProviderConfigDialog(provider_id, self.definitions[provider_id].label, self.settings, self)
@@ -174,8 +180,8 @@ class ProviderSettingsDialog(QDialog):
     def _test(self, provider_id: str):
         self._sync_row(provider_id)
         result = test_provider(provider_id, self.settings)
-        self.status_items[provider_id].setText("ok" if result.get("ok") else "error")
-        title = "Prueba correcta" if result.get("ok") else "Prueba fallida"
+        self.status_items[provider_id].setText(tr("dialog.provider.status.ok") if result.get("ok") else tr("status.error"))
+        title = tr("dialog.provider.test_ok") if result.get("ok") else tr("dialog.provider.test_failed")
         QMessageBox.information(self, title, str(result.get("message", "")))
 
     def _signup(self, provider_id: str):
@@ -209,7 +215,7 @@ class ProviderConfigDialog(QDialog):
 
     def __init__(self, provider_id: str, label: str, settings: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Configurar {label}")
+        self.setWindowTitle(tr("dialog.provider.configure_title", name=label))
         self.provider_id = provider_id
         self.cfg = copy.deepcopy(settings.get("cover_providers", {}).get(provider_id, {}))
         self.inputs: dict[str, object] = {}
@@ -238,9 +244,11 @@ class ProviderConfigDialog(QDialog):
             self.inputs[key] = widget
             form.addRow(label, widget)
         layout.addLayout(form)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        for button in buttons.buttons():
-            apply_interactive_cursor(button)
+        buttons = QDialogButtonBox()
+        save_button = buttons.addButton(tr("action.save"), QDialogButtonBox.ButtonRole.AcceptRole)
+        cancel_button = buttons.addButton(tr("action.cancel"), QDialogButtonBox.ButtonRole.RejectRole)
+        apply_interactive_cursor(save_button)
+        apply_interactive_cursor(cancel_button)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
