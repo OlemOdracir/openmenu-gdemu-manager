@@ -1,7 +1,6 @@
 ﻿import hashlib
 import logging
 import urllib.parse
-import urllib.request
 from io import BytesIO
 from pathlib import Path
 
@@ -12,7 +11,7 @@ from ..core.matching import has_conflicting_numbers
 from ..core.models import Candidate, GameItem
 from ..config.paths import MANAGER_CACHE_DIR
 from ..services.cover_library import load_saved_candidates, save_candidates
-from .providers.base import USER_AGENT
+from .providers.base import read_image_url
 from .providers.registry import (
     iter_enabled_providers,
     provider_threshold,
@@ -96,9 +95,7 @@ def download_candidate(candidate: Candidate) -> Path:
     out_path = out_dir / f"{safe_stem}_{digest}.png"
     if out_path.exists():
         return out_path
-    req = urllib.request.Request(candidate.url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = resp.read()
+    data = read_image_url(candidate.url, timeout=30)
     Image.open(BytesIO(data)).convert("RGB").save(out_path, "PNG")
     return out_path
 

@@ -6,7 +6,6 @@ import os
 import re
 import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +13,7 @@ from ...config.paths import MANAGER_CACHE_DIR
 from ...core.aliases import is_alias_match, query_variants
 from ...core.matching import score_candidate
 from ...core.models import Candidate, GameItem
-from .base import USER_AGENT
+from .base import read_json_url
 
 
 def screenscraper_candidates(game: GameItem, query: str, settings: dict[str, Any]) -> list[Candidate]:
@@ -127,6 +126,8 @@ def _validate_config(cfg: dict[str, Any]) -> None:
 def _search_json(query: str, cfg: dict[str, Any], force_refresh: bool = False) -> dict[str, Any]:
     cfg = _resolved_config(cfg)
     base_url = str(cfg.get("base_url") or "https://api.screenscraper.fr/api2").rstrip("/")
+    if urllib.parse.urlparse(base_url).scheme.lower() != "https":
+        raise ValueError("ScreenScraper debe usar una URL HTTPS.")
     endpoint = f"{base_url}/jeuRecherche.php"
     params = {
         "devid": str(cfg.get("devid", "")),
@@ -145,10 +146,7 @@ def _search_json(query: str, cfg: dict[str, Any], force_refresh: bool = False) -
     if cache_path.exists() and not force_refresh:
         return json.loads(cache_path.read_text(encoding="utf-8"))
     timeout = int(cfg.get("timeout", 30) or 30)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = resp.read().decode("utf-8", errors="replace")
-    data = json.loads(payload)
+    data = read_json_url(url, timeout=timeout)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return data

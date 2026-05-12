@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 import urllib.parse
-import urllib.request
 from typing import Any
 
 from ...core.matching import score_candidate
 from ...core.models import Candidate, GameItem
-from .base import USER_AGENT
+from .base import read_json_url
 
 
 def community_api_candidates(game: GameItem, query: str, settings: dict[str, Any]) -> list[Candidate]:
@@ -15,10 +13,9 @@ def community_api_candidates(game: GameItem, query: str, settings: dict[str, Any
     base_url = str(cfg.get("base_url", "")).strip().rstrip("/")
     if not base_url:
         return []
+    _validate_api_base_url(base_url)
     url = f"{base_url}/v1/covers/search?system=dreamcast&query={urllib.parse.quote(query)}"
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=int(cfg.get("timeout", 20) or 20)) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    payload = read_json_url(url, timeout=int(cfg.get("timeout", 20) or 20))
     if not payload.get("ok"):
         return []
     candidates: list[Candidate] = []
@@ -44,13 +41,18 @@ def test_connection(settings: dict[str, Any]) -> dict[str, Any]:
     base_url = str(cfg.get("base_url", "")).strip().rstrip("/")
     if not base_url:
         return {"ok": False, "message": "OpenMenu Cover API no tiene URL configurada.", "count": 0}
+    _validate_api_base_url(base_url)
     url = f"{base_url}/health"
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=int(cfg.get("timeout", 20) or 20)) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    payload = read_json_url(url, timeout=int(cfg.get("timeout", 20) or 20))
     ok = bool(payload.get("ok"))
     return {
         "ok": ok,
         "message": "OpenMenu Cover API disponible." if ok else "OpenMenu Cover API no respondio correctamente.",
         "count": 0,
     }
+
+
+def _validate_api_base_url(base_url: str) -> None:
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        raise ValueError("OpenMenu Cover API debe usar una URL HTTPS.")
