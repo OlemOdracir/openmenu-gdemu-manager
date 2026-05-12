@@ -1,11 +1,30 @@
 import os
 import shutil
+import sys
 from pathlib import Path
 
 
 APP_DIR_NAME = "OpenMenu GDEMU Manager"
 PACKAGE_ROOT = Path(__file__).resolve().parents[3]
-BUNDLED_BUILDGDI_PATH = PACKAGE_ROOT / "third_party" / "buildgdi" / "buildgdi.exe"
+
+
+def _bundled_buildgdi_path() -> Path:
+    candidates: list[Path] = []
+    pyinstaller_root = getattr(sys, "_MEIPASS", "")
+    if pyinstaller_root:
+        candidates.append(Path(pyinstaller_root) / "third_party" / "buildgdi" / "buildgdi.exe")
+    if getattr(sys, "frozen", False):
+        candidates.append(Path(sys.executable).resolve().parent / "_internal" / "third_party" / "buildgdi" / "buildgdi.exe")
+        candidates.append(Path(sys.executable).resolve().parent / "third_party" / "buildgdi" / "buildgdi.exe")
+    candidates.append(PACKAGE_ROOT / "third_party" / "buildgdi" / "buildgdi.exe")
+    candidates.append(Path(sys.prefix) / "third_party" / "buildgdi" / "buildgdi.exe")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return candidates[0].resolve() if candidates else (PACKAGE_ROOT / "third_party" / "buildgdi" / "buildgdi.exe")
+
+
+BUNDLED_BUILDGDI_PATH = _bundled_buildgdi_path()
 
 
 def _runtime_root() -> Path:
