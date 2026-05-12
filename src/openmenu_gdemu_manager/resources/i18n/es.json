@@ -19,6 +19,7 @@
     "menu.export_report": "Exportar reporte...",
     "menu.online_sources": "Fuentes online",
     "menu.backup_current_sd": "Respaldar SD actual...",
+    "menu.show_status_column": "Mostrar columna Estado",
     "menu.install_template_zip": "Instalar template desde ZIP...",
     "menu.install_template_url": "Instalar template desde URL...",
     "menu.open_templates_folder": "Abrir carpeta de templates",

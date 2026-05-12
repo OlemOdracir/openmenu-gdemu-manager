@@ -20,3 +20,9 @@ def test_load_settings_maps_legacy_provider_flags(tmp_path):
 
     assert loaded["cover_providers"]["local"]["enabled"] is False
     assert loaded["cover_providers"]["openmenu"]["enabled"] is True
+
+
+def test_status_column_is_hidden_by_default_for_existing_settings():
+    merged = merge_settings(DEFAULT_SETTINGS, {"ui": {}})
+
+    assert merged["ui"]["show_status_column"] is False

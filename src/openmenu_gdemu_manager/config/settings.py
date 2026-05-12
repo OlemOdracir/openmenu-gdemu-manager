@@ -184,6 +184,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "icon_style": "themed",
         "animations": True,
         "show_button_labels": False,
+        "show_status_column": False,
     },
 }
 

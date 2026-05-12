@@ -315,6 +315,7 @@ class MainWindow(QMainWindow):
         self.table.setItemDelegateForColumn(GamesTableModel.C_STATUS, StatusIconDelegate(self.table))
         self.table.setItemDelegateForColumn(GamesTableModel.C_QUALITY, QualityIconDelegate(self.table))
         self.table.setColumnHidden(GamesTableModel.C_CHECK, True)
+        self._apply_table_column_preferences()
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
         self.table.setMouseTracking(True)
@@ -379,12 +380,7 @@ class MainWindow(QMainWindow):
         self.language_group.setExclusive(True)
         self.rebuild_language_menu()
         self.settings_menu = self.menuBar().addMenu(tr("menu.settings"))
-        providers_action = QAction(action_qicon("web"), tr("menu.online_sources"), self)
-        providers_action.triggered.connect(lambda: self.safe_call(self.open_provider_settings))
-        self.settings_menu.addAction(providers_action)
-        backup_action = QAction(action_qicon("templates_folder"), tr("menu.backup_current_sd"), self)
-        backup_action.triggered.connect(lambda: self.safe_call(self.force_backup_current_sd))
-        self.settings_menu.addAction(backup_action)
+        self._populate_settings_menu()
         self.help_menu = self.menuBar().addMenu(tr("menu.help"))
         about_action = QAction(app_qicon(), tr("menu.about"), self)
         about_action.triggered.connect(lambda: self.safe_call(self.show_about))
@@ -571,12 +567,7 @@ class MainWindow(QMainWindow):
         self.language_menu = self.menuBar().addMenu(tr("menu.language"))
         self.rebuild_language_menu()
         self.settings_menu = self.menuBar().addMenu(tr("menu.settings"))
-        providers_action = QAction(action_qicon("web"), tr("menu.online_sources"), self)
-        providers_action.triggered.connect(lambda: self.safe_call(self.open_provider_settings))
-        self.settings_menu.addAction(providers_action)
-        backup_action = QAction(action_qicon("templates_folder"), tr("menu.backup_current_sd"), self)
-        backup_action.triggered.connect(lambda: self.safe_call(self.force_backup_current_sd))
-        self.settings_menu.addAction(backup_action)
+        self._populate_settings_menu()
         self.help_menu = self.menuBar().addMenu(tr("menu.help"))
         about_action = QAction(app_qicon(), tr("menu.about"), self)
         about_action.triggered.connect(lambda: self.safe_call(self.show_about))
@@ -585,6 +576,36 @@ class MainWindow(QMainWindow):
         update_action.triggered.connect(lambda: self.safe_call(self.check_for_updates))
         self.help_menu.addAction(update_action)
         self.populate_table()
+
+    def _populate_settings_menu(self):
+        providers_action = QAction(action_qicon("web"), tr("menu.online_sources"), self)
+        providers_action.triggered.connect(lambda: self.safe_call(self.open_provider_settings))
+        self.settings_menu.addAction(providers_action)
+        backup_action = QAction(action_qicon("templates_folder"), tr("menu.backup_current_sd"), self)
+        backup_action.triggered.connect(lambda: self.safe_call(self.force_backup_current_sd))
+        self.settings_menu.addAction(backup_action)
+        self.settings_menu.addSeparator()
+        self.show_status_column_action = QAction(action_qicon("bulk_mode"), tr("menu.show_status_column"), self)
+        self.show_status_column_action.setCheckable(True)
+        self.show_status_column_action.setChecked(self._status_column_enabled())
+        self.show_status_column_action.triggered.connect(
+            lambda checked=False: self.safe_call(lambda: self.toggle_status_column(bool(checked)))
+        )
+        self.settings_menu.addAction(self.show_status_column_action)
+        self._apply_table_column_preferences()
+
+    def _status_column_enabled(self) -> bool:
+        return bool(self.settings.get("ui", {}).get("show_status_column", False))
+
+    def _apply_table_column_preferences(self):
+        if hasattr(self, "table"):
+            self.table.setColumnHidden(GamesTableModel.C_STATUS, not self._status_column_enabled())
+        if hasattr(self, "show_status_column_action"):
+            self.show_status_column_action.setChecked(self._status_column_enabled())
+
+    def toggle_status_column(self, visible: bool):
+        self.settings = set_ui_preference("show_status_column", bool(visible), self.settings)
+        self._apply_table_column_preferences()
 
     def show_about(self):
         AboutDialog(self).exec()
