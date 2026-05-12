@@ -598,14 +598,23 @@ class MainWindow(QMainWindow):
         return bool(self.settings.get("ui", {}).get("show_status_column", False))
 
     def _apply_table_column_preferences(self):
+        status_visible = self._status_column_enabled()
         if hasattr(self, "table"):
-            self.table.setColumnHidden(GamesTableModel.C_STATUS, not self._status_column_enabled())
+            self.table.setColumnHidden(GamesTableModel.C_STATUS, not status_visible)
+        if hasattr(self, "status_filter"):
+            self.status_filter.setVisible(status_visible)
+            if not status_visible and self.status_filter.currentData() != "todos":
+                self.status_filter.blockSignals(True)
+                index = self.status_filter.findData("todos")
+                self.status_filter.setCurrentIndex(max(index, 0))
+                self.status_filter.blockSignals(False)
         if hasattr(self, "show_status_column_action"):
-            self.show_status_column_action.setChecked(self._status_column_enabled())
+            self.show_status_column_action.setChecked(status_visible)
 
     def toggle_status_column(self, visible: bool):
         self.settings = set_ui_preference("show_status_column", bool(visible), self.settings)
         self._apply_table_column_preferences()
+        self.apply_filters()
 
     def show_about(self):
         AboutDialog(self).exec()
@@ -871,7 +880,7 @@ class MainWindow(QMainWindow):
     def apply_filters(self):
         try:
             needle = self.text_filter.text().lower().strip()
-            status = str(self.status_filter.currentData() or "todos")
+            status = str(self.status_filter.currentData() or "todos") if self._status_column_enabled() else "todos"
             self.filtered_games = []
             for game in self.games:
                 hay = f"{game.slot:03d} {game.name} {game.product_id}".lower()
