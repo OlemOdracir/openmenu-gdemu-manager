@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from openmenu_gdemu_manager.core.image_quality import QualityReport
 from openmenu_gdemu_manager.dreamcast import scanner
 from openmenu_gdemu_manager.dreamcast.scanner import analyze_menu_consistency, scan_sd_root
 from openmenu_gdemu_manager.dreamcast.openmenu_dat import DatEntry
@@ -20,12 +21,19 @@ def test_scan_prefers_dat_cover_over_legacy_slot_index(monkeypatch, tmp_path):
     monkeypatch.setattr(scanner, "_load_openmenu_box_entries", lambda root_path, track_path: {"T1234M": DatEntry("T1234M", b"")})
     monkeypatch.setattr(scanner, "extract_dat_cover", lambda entries, serial, out_path: dat_cover)
     monkeypatch.setattr(scanner, "extract_cover_from_track", lambda track_path, index, out_path: legacy_cover)
-    monkeypatch.setattr(scanner, "analyze_image_file", lambda path: None)
+    monkeypatch.setattr(
+        scanner,
+        "analyze_image_file",
+        lambda path: QualityReport("Baja", 45, 256, 256, 256, 1.0, 10.0, True),
+    )
 
     games = scan_sd_root(root, state=None, ini_path=tmp_path / "missing.ini")
 
     assert len(games) == 1
     assert games[0].current_cover == dat_cover
+    assert games[0].quality_label == "OpenMenu"
+    assert games[0].quality_score == 100
+    assert games[0].normalization_mode == "openmenu_dat"
 
 
 def test_analyze_menu_consistency_detects_sparse_slots_and_menu_mismatch():

@@ -13,7 +13,7 @@ from .metadata import (
     read_name_txt,
 )
 from .openmenu_dat import BOX_ENTRY_SIZE, DatEntry, extract_dat_cover, read_dat_by_name
-from ..core.image_quality import analyze_image_file, apply_quality_report
+from ..core.image_quality import QualityReport, analyze_image_file, apply_quality_report
 from ..core.models import GameItem
 from ..config.paths import AUDIT_DIR, DEFAULT_INI, MANAGER_CACHE_DIR
 from ..config.settings import configured_buildgdi_path, load_settings
@@ -73,11 +73,13 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
                     break
 
         current_cover = None
+        current_cover_source = ""
         if box_entries:
             for serial in artwork_serials or [f"SLOT{slot:03d}"]:
                 out_path = MANAGER_CACHE_DIR / "current" / root_fingerprint(root) / f"slot{slot:03d}_{serial}_box.png"
                 current_cover = extract_dat_cover(box_entries, serial, out_path)
                 if current_cover is not None:
+                    current_cover_source = "openmenu_dat"
                     break
 
         if current_cover is None and cover_index is not None and track_path.exists():
@@ -85,6 +87,8 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
             current_cover = extract_cover_from_track(track_path, cover_index, out_path)
             if current_cover is None:
                 log.warning("Could not extract cover for slot %03d idx %s", slot, cover_index)
+            else:
+                current_cover_source = "openmenu_track"
 
         game = GameItem(
             slot=slot,
@@ -108,14 +112,33 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
         if game.consistency_warnings and not game.save_status:
             game.save_status = "pendiente_guardar"
         if current_cover is not None:
-            report = analyze_image_file(current_cover)
-            if report is not None:
-                apply_quality_report(game, report, "openmenu_current")
+            _apply_scanned_cover_quality(game, current_cover, current_cover_source)
         if state is not None:
             apply_state(game, state, root)
         games.append(game)
     log.info("Scan finished: %s games from %s", len(games), root)
     return games
+
+
+def _apply_scanned_cover_quality(game: GameItem, cover_path: Path, source: str) -> None:
+    report = analyze_image_file(cover_path)
+    if report is None:
+        return
+    if source in {"openmenu_dat", "openmenu_track"}:
+        normalized_report = QualityReport(
+            label="OpenMenu",
+            score=100,
+            width=report.width,
+            height=report.height,
+            min_side=report.min_side,
+            aspect_ratio=report.aspect_ratio,
+            sharpness=report.sharpness,
+            accepted=True,
+            warning="Caratula ya normalizada dentro del menu OpenMenu.",
+        )
+        apply_quality_report(game, normalized_report, source)
+        return
+    apply_quality_report(game, report, "openmenu_current")
 
 
 def analyze_menu_consistency(physical_slots: set[int], metadata: dict[int, dict[str, str]]) -> dict[int, list[str]]:

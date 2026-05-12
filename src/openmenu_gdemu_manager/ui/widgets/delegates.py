@@ -138,7 +138,9 @@ def _draw_badge_icon(painter: QPainter, rect, color: str, glyph: str) -> None:
 
 def _draw_quality_bars(painter: QPainter, rect, value: str, palette: dict) -> None:
     normalized = value.strip().lower()
-    if normalized == "alta":
+    if normalized in {"openmenu", "sd", "normalizada"}:
+        bars, color = 3, palette["success"]
+    elif normalized == "alta":
         bars, color = 3, palette["success"]
     elif normalized == "aceptable":
         bars, color = 2, palette["accent"]

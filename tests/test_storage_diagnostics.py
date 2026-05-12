@@ -18,6 +18,7 @@ def test_diagnose_storage_empty_path_can_be_prepared(tmp_path):
 
 def test_diagnose_storage_ignores_os_metadata_for_empty_path(tmp_path):
     (tmp_path / "WPSettings.dat").write_text("", encoding="utf-8")
+    (tmp_path / "GDEMU.ini").write_text("", encoding="utf-8")
     (tmp_path / "System Volume Information").mkdir()
     (tmp_path / "_openmenu_gdemu_manager").mkdir()
 
@@ -28,6 +29,7 @@ def test_diagnose_storage_ignores_os_metadata_for_empty_path(tmp_path):
     assert diagnostic.summary.other_entries == []
     assert sorted(name.lower() for name in diagnostic.summary.ignored_entries) == [
         "_openmenu_gdemu_manager",
+        "gdemu.ini",
         "system volume information",
         "wpsettings.dat",
     ]

@@ -27,6 +27,7 @@ MENU_UNKNOWN = "unknown"
 
 IGNORED_EMPTY_NAMES = {
     "_openmenu_gdemu_manager",
+    "gdemu.ini",
     "system volume information",
     "$recycle.bin",
     "desktop.ini",
