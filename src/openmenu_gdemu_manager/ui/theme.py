@@ -376,9 +376,9 @@ QPushButton[attention="true"] {{
     padding: 6px 12px;
 }}
 QPushButton[attention="true"][pulse="true"] {{
-    background: {c['accent_soft']};
-    color: {c['accent_text']};
-    border: 2px solid {c['accent']};
+    background: {c['success_soft']};
+    color: {c['success']};
+    border: 2px solid #29f3a7;
 }}
 QPushButton[variant="warning"] {{
     background: {c['warning_soft']};

@@ -33,6 +33,7 @@ def apply_state(game: GameItem, state: dict, root: Path) -> None:
     data = state.get("games", {}).get(game_key(root, game.slot), {})
     if not _state_matches_game(game, data):
         return
+    scanned_cover = game.current_cover is not None
     saved_name = (data.get("name") or "").strip()
     if saved_name:
         game.name = saved_name
@@ -43,6 +44,13 @@ def apply_state(game: GameItem, state: dict, root: Path) -> None:
     status = data.get("status")
     if status in VALID_STATES:
         game.status = status
+    if scanned_cover:
+        game.selected_image = str(game.current_cover or "")
+        game.original_image = ""
+        game.preview_image = ""
+        if not game.selected_source:
+            game.selected_source = game.normalization_mode or "openmenu_current"
+        return
     game.selected_image = data.get("selected_image", "")
     game.original_image = data.get("original_image", "")
     game.preview_image = data.get("preview_image", "")

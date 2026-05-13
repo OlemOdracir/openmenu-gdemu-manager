@@ -3,7 +3,13 @@
 from pathlib import Path
 
 from ..core.matching import normalize
-from .metadata import detect_media_type, parse_openmenu_ini, read_name_txt
+from .metadata import (
+    detect_media_type,
+    parse_openmenu_ini,
+    read_disc_product_id,
+    read_disc_product_id_from_image,
+    read_name_txt,
+)
 from ..core.models import GameItem, RomLibraryEntry
 from ..config.paths import DEFAULT_INI
 from ..config.settings import configured_rom_dirs, supported_media_types
@@ -31,8 +37,8 @@ def scan_rom_library(settings: dict, existing_games: list[GameItem]) -> list[Rom
 
 
 def inspect_source(path: Path, supported: set[str] | None = None, known: dict[str, dict[str, str]] | None = None) -> RomLibraryEntry | None:
-    supported = supported or {"GDI", "CDI"}
-    known = known or _known_metadata()
+    supported = supported if supported is not None else {"GDI", "CDI"}
+    known = known if known is not None else _known_metadata()
     path = Path(path)
     if path.is_file():
         suffix = path.suffix.lower()
@@ -40,11 +46,12 @@ def inspect_source(path: Path, supported: set[str] | None = None, known: dict[st
             return _entry_from_folder(path.parent, known)
         if suffix == ".cdi" and "CDI" in supported:
             metadata = known.get(normalize(path.stem), {})
+            product_id = metadata.get("product", "") or read_disc_product_id_from_image(path)
             return RomLibraryEntry(
                 name=read_name_txt(path.parent) or path.stem,
                 media_type="CDI",
                 source_path=str(path),
-                product_id=metadata.get("product", ""),
+                product_id=product_id,
                 region=metadata.get("region", ""),
                 disc=metadata.get("disc", "1/1"),
                 vga=metadata.get("vga", "1"),
@@ -63,11 +70,12 @@ def _entry_from_folder(folder: Path, known: dict[str, dict[str, str]]) -> RomLib
         return None
     name = read_name_txt(folder) or folder.name
     metadata = known.get(normalize(name), {})
+    product_id = metadata.get("product", "") or read_disc_product_id(folder)
     return RomLibraryEntry(
         name=name,
         media_type=media_type,
         source_path=str(folder),
-        product_id=metadata.get("product", ""),
+        product_id=product_id,
         region=metadata.get("region", ""),
         disc=metadata.get("disc", "1/1"),
         vga=metadata.get("vga", "1"),

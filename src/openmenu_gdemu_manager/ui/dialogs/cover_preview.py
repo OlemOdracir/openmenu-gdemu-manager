@@ -71,6 +71,7 @@ class CoverPreviewDialog(QDialog):
             name.setObjectName("MutedLabel")
             val = QLabel(str(value or "-"))
             val.setObjectName("TileTitle")
+            val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             item.addWidget(name)
             item.addWidget(val)
@@ -124,13 +125,17 @@ class CoverPreviewDialog(QDialog):
                 image_size = f"{width}x{height}"
             if self.proposal.candidate is not None:
                 source = self.proposal.candidate.source
-        return [
+        items = [
             (tr("table.status"), self._friendly_status()),
+            (tr("table.product_id"), self.game.product_id or "-"),
             (tr("table.quality"), quality),
             (tr("dialog.cover_preview.score"), score),
             (tr("dialog.cover_preview.size"), image_size),
             (tr("dialog.cover_preview.source"), source),
         ]
+        if self.game.internal_name:
+            items.insert(2, (tr("dialog.candidate.internal_name"), self.game.internal_name))
+        return items
 
     def _friendly_status(self) -> str:
         values = {

@@ -7,6 +7,7 @@ from openmenu_gdemu_manager.dreamcast.metadata import (
     parse_openmenu_from_track,
     parse_openmenu_ini,
     parse_openmenu_text,
+    read_disc_internal_name,
     read_disc_product_id,
     read_name_txt,
 )
@@ -147,15 +148,40 @@ def test_apply_state_does_not_override_scanned_current_cover(tmp_path):
                 "name": "DEAD OR ALIVE 2",
                 "product_id": "T3601M",
                 "selected_image": str(cached_cover),
+                "original_image": str(tmp_path / "original_1200.png"),
+                "selected_source": "local",
+                "quality_label": "Alta",
+                "quality_score": 92,
+                "image_width": 1200,
+                "image_height": 1200,
+                "normalization_mode": "contain_square",
             }
         }
     }
 
-    game = GameItem(slot=7, name="DEAD OR ALIVE 2", product_id="T3601M", current_cover=scanned_cover)
+    game = GameItem(
+        slot=7,
+        name="DEAD OR ALIVE 2",
+        product_id="T3601M",
+        current_cover=scanned_cover,
+        selected_source="openmenu_dat",
+        quality_label="OpenMenu",
+        quality_score=100,
+        image_width=256,
+        image_height=256,
+        normalization_mode="openmenu_dat",
+    )
     apply_state(game, state, root)
 
     assert game.current_cover == scanned_cover
-    assert game.selected_image == str(cached_cover)
+    assert game.selected_image == str(scanned_cover)
+    assert game.original_image == ""
+    assert game.selected_source == "openmenu_dat"
+    assert game.quality_label == "OpenMenu"
+    assert game.quality_score == 100
+    assert game.image_width == 256
+    assert game.image_height == 256
+    assert game.normalization_mode == "openmenu_dat"
 
 
 def test_apply_state_accepts_saved_product_that_matches_artwork_alias(tmp_path):
@@ -206,6 +232,34 @@ def test_read_disc_product_id_reads_ip_bin_from_declared_gdi_track(tmp_path):
     (folder / "track03.iso").write_bytes(bytes(ip))
 
     assert read_disc_product_id(folder) == "T0000M"
+
+
+def test_read_disc_internal_name_reads_ip_bin_software_title(tmp_path):
+    folder = tmp_path / "073"
+    folder.mkdir()
+    (folder / "disc.gdi").write_text(
+        "\n".join(["1", "1 45000 4 2048 track03.iso 0"]),
+        encoding="ascii",
+    )
+    ip = bytearray(0x100)
+    ip[:16] = b"SEGA SEGAKATANA "
+    ip[0x80:0x100] = b"SKIES OF ARCADIA DISC 2".ljust(0x80, b" ")
+    (folder / "track03.iso").write_bytes(bytes(ip))
+
+    assert read_disc_internal_name(folder) == "SKIES OF ARCADIA DISC 2"
+
+
+def test_read_disc_metadata_searches_cdi_for_embedded_ip_bin(tmp_path):
+    folder = tmp_path / "073"
+    folder.mkdir()
+    ip = bytearray(0x100)
+    ip[:16] = b"SEGA SEGAKATANA "
+    ip[0x40:0x50] = b"MK-51052  V1.000"
+    ip[0x80:0x100] = b"SKIES OF ARCADIA DISC2".ljust(0x80, b" ")
+    (folder / "disc.cdi").write_bytes(b"\x00" * 4096 + bytes(ip))
+
+    assert read_disc_product_id(folder) == "MK51052"
+    assert read_disc_internal_name(folder) == "SKIES OF ARCADIA DISC2"
 
 
 def test_menu_product_id_prefers_real_disc_serial_and_repairs_synthetic_slot_id():

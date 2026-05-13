@@ -15,6 +15,7 @@ class GameItem:
     vga: str = ""
     version: str = ""
     date: str = ""
+    internal_name: str = ""
     media_type: str = ""
     folder: Path | None = None
     cover_index: int | None = None

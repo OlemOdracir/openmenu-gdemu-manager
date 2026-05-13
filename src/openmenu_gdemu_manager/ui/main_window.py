@@ -59,7 +59,7 @@ from ..config.settings import (
 )
 from ..config.state import load_state, update_game_state
 from ..dreamcast.storage_diagnostics import StorageDiagnostic
-from ..services.bulk_service import has_saveable_proposal, valid_cover_proposals
+from ..services.bulk_service import valid_cover_proposals
 from ..services.backup_service import backup_decision
 from ..services.sd_registry import registered_backup_exists
 from ..services.cover_service import persist_cover_selection
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         self.save_attention_pulse = False
         self.save_attention_phase = 0
         self.save_attention_timer = QTimer(self)
-        self.save_attention_timer.setInterval(240)
+        self.save_attention_timer.setInterval(550)
         self.save_attention_timer.timeout.connect(self._pulse_save_buttons)
         self.save_bulk_thread: QThread | None = None
         self.save_bulk_worker: SaveBulkWorker | None = None
@@ -288,6 +288,7 @@ class MainWindow(QMainWindow):
         self.save_bulk_button = action_button(self, "save", tr("filter.save_bulk_tooltip"), variant="success", label=tr("action.save"))
         self.save_bulk_button.clicked.connect(lambda: self.safe_call(self.save_bulk_proposals))
         self.save_bulk_button.setEnabled(False)
+        self.save_bulk_button.setVisible(False)
         filters.addWidget(self.save_bulk_button)
         self.discard_bulk_button = action_button(self, "discard", tr("filter.discard_bulk_tooltip"), variant="danger", label=tr("action.discard"))
         self.discard_bulk_button.clicked.connect(lambda: self.safe_call(self.discard_bulk_proposals))
@@ -301,12 +302,11 @@ class MainWindow(QMainWindow):
             (self.save_changes_button, "pending"),
             (self.bulk_mode_button, "always"),
             (self.bulk_button, "bulk_mode"),
-            (self.save_bulk_button, "bulk_valid"),
             (self.discard_bulk_button, "bulk_any"),
         ]
 
         self.games_model = GamesTableModel(self)
-        self.games_model.checked_changed.connect(lambda slot, checked: self.bulk_checked.__setitem__(slot, checked))
+        self.games_model.checked_changed.connect(self._on_bulk_checked_changed)
         self.table = QTableView()
         self.table.setHorizontalHeader(BulkSelectionHeader(Qt.Orientation.Horizontal, self.table))
         self.table.setModel(self.games_model)
@@ -903,6 +903,7 @@ class MainWindow(QMainWindow):
             self._set_row_actions(row, game)
         self.save_changes_button.setEnabled(self.write_allowed and self.has_pending_changes())
         self._update_save_button_state()
+        self._update_bulk_delete_button_state()
 
     def _set_row_actions(self, row: int, game: GameItem):
         actions = QWidget()
@@ -1091,7 +1092,7 @@ class MainWindow(QMainWindow):
         return self.pending_change_count() > 0
 
     def pending_change_count(self) -> int:
-        return sum(
+        game_changes = sum(
             1
             for game in self.games
             if (
@@ -1100,6 +1101,10 @@ class MainWindow(QMainWindow):
                 or game.save_status in {"pendiente_guardar", "pendiente_eliminar"}
             )
         )
+        return game_changes + self._valid_bulk_proposal_count()
+
+    def _valid_bulk_proposal_count(self) -> int:
+        return len(valid_cover_proposals(self.bulk_proposals))
 
     def _pending_apply_counts(self, cover_override: int | None = None) -> dict[str, int]:
         additions = len([game for game in self.games if game.pending_add])
@@ -1113,6 +1118,7 @@ class MainWindow(QMainWindow):
                 and Path(game.selected_image).exists()
                 and not game.has_placeholder_cover
             ])
+            covers += self._valid_bulk_proposal_count()
         else:
             covers = cover_override
         plan = SdSlotTransactionService(self.root_path, "preview").build_plan(self.games)
@@ -1140,11 +1146,21 @@ class MainWindow(QMainWindow):
         if not has_changes:
             self.save_changes_button.setProperty("pulse", "false")
             self._clear_button_glow(self.save_changes_button)
+        elif self.save_changes_button.property("pulse") != "true":
+            self.save_attention_pulse = True
+            self.save_changes_button.setProperty("pulse", "true")
+            self._apply_button_glow(self.save_changes_button)
         self._repolish(self.save_changes_button)
         self._update_attention_timer()
 
     def _update_bulk_save_button_attention(self, saveable: int | None = None):
         if not hasattr(self, "save_bulk_button"):
+            return
+        if not self.save_bulk_button.isVisible():
+            self.save_bulk_button.setEnabled(False)
+            self.save_bulk_button.setProperty("attention", "false")
+            self.save_bulk_button.setProperty("pulse", "false")
+            self._clear_button_glow(self.save_bulk_button)
             return
         if saveable is None:
             saveable = len(valid_cover_proposals(self.bulk_proposals))
@@ -1192,15 +1208,13 @@ class MainWindow(QMainWindow):
                 self._repolish(self.save_bulk_button)
 
     def _apply_button_glow(self, button: QPushButton):
-        offsets = [(0, -5), (3, -3), (5, 0), (3, 3), (0, 5), (-3, 3), (-5, 0), (-3, -3)]
-        dx, dy = offsets[self.save_attention_phase % len(offsets)]
         effect = button.graphicsEffect()
         if not isinstance(effect, QGraphicsDropShadowEffect):
             effect = QGraphicsDropShadowEffect(button)
             button.setGraphicsEffect(effect)
-        effect.setBlurRadius(22 if self.save_attention_pulse else 14)
-        effect.setOffset(dx, dy)
-        effect.setColor(QColor(22, 163, 74, 190 if self.save_attention_pulse else 130))
+        effect.setBlurRadius(28 if self.save_attention_pulse else 12)
+        effect.setOffset(0, 0)
+        effect.setColor(QColor(41, 243, 167, 210 if self.save_attention_pulse else 95))
 
     def _clear_button_glow(self, button: QPushButton):
         if button.graphicsEffect() is not None:
@@ -1233,6 +1247,9 @@ class MainWindow(QMainWindow):
             return
         if self.save_thread is not None and self.save_thread.isRunning():
             QMessageBox.information(self, APP_NAME, tr("save.running"))
+            return
+        if self._valid_bulk_proposal_count():
+            self.save_bulk_proposals(confirm=confirm)
             return
         if confirm:
             counts = self._pending_apply_counts()
@@ -1354,7 +1371,44 @@ class MainWindow(QMainWindow):
             self.games_model.set_bulk_mode(False, {})
             self.bulk_button.setEnabled(False)
             self.status.setText(tr("bulk.disabled"))
+        self._update_bulk_delete_button_state()
         self.apply_filters()
+
+    def _on_bulk_checked_changed(self, slot: int, checked: bool):
+        self.bulk_checked[slot] = checked
+        self._update_bulk_delete_button_state()
+
+    def _selected_bulk_games(self) -> list[GameItem]:
+        if not self.bulk_mode:
+            return []
+        return [game for game in self.games if self.bulk_checked.get(game.slot, False)]
+
+    def _bulk_delete_targets(self) -> list[GameItem]:
+        return [
+            game for game in self._selected_bulk_games()
+            if not game.pending_delete and not (game.pending_add and game.is_new)
+        ]
+
+    def _update_bulk_delete_button_state(self):
+        if not hasattr(self, "discard_bulk_button"):
+            return
+        delete_count = len(self._bulk_delete_targets())
+        has_delete_targets = delete_count > 0 and self.write_allowed
+        has_proposals = bool(self.bulk_proposals)
+        self.discard_bulk_button.setEnabled(has_delete_targets or has_proposals)
+        if has_proposals:
+            text = tr("action.discard")
+            tooltip = tr("filter.discard_bulk_tooltip")
+        elif has_delete_targets:
+            text = tr("action.delete")
+            tooltip = tr("bulk.delete_selected_tooltip", count=delete_count)
+        else:
+            text = tr("action.discard")
+            tooltip = tr("filter.discard_bulk_tooltip")
+        if not self.discard_bulk_button.property("iconOnly"):
+            self.discard_bulk_button.setText(text)
+        self.discard_bulk_button.setToolTip(tooltip)
+        self.discard_bulk_button.setAccessibleName(tooltip)
 
     def toggle_bulk_header_selection(self):
         if not self.bulk_mode:
@@ -1363,6 +1417,7 @@ class MainWindow(QMainWindow):
         self.bulk_checked = _bulk_selection_map(self.games, select_all)
         self.games_model.set_bulk_mode(True, self.bulk_checked)
         self.apply_filters()
+        self._update_bulk_delete_button_state()
         if select_all:
             self.status.setText(tr("bulk.selected_all", count=len(self.games)))
         else:
@@ -1418,7 +1473,6 @@ class MainWindow(QMainWindow):
             self.bulk_mode_button.setEnabled(True)
             self.scan_button.setEnabled(True)
             saveable = len(valid_cover_proposals(self.bulk_proposals))
-            self.save_bulk_button.setEnabled(saveable > 0)
             if saveable:
                 self.save_bulk_button.setToolTip(tr("bulk.save_ready_tooltip", count=saveable))
                 self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
@@ -1426,8 +1480,9 @@ class MainWindow(QMainWindow):
                 self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
                 self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
             self._update_bulk_save_button_attention(saveable)
-            self.discard_bulk_button.setEnabled(bool(self.bulk_proposals))
+            self._update_bulk_delete_button_state()
             self.apply_filters()
+            self._update_save_button_state()
             summary_key = "bulk.summary_apply" if saveable else "bulk.summary"
             self.status.setText(
                 tr(
@@ -1451,12 +1506,12 @@ class MainWindow(QMainWindow):
         self.bulk_mode_button.setEnabled(True)
         self.scan_button.setEnabled(True)
         saveable = len(valid_cover_proposals(self.bulk_proposals))
-        self.save_bulk_button.setEnabled(saveable > 0)
         self._update_bulk_save_button_attention(saveable)
-        self.discard_bulk_button.setEnabled(bool(self.bulk_proposals))
+        self._update_bulk_delete_button_state()
+        self._update_save_button_state()
         self.show_error(message)
 
-    def save_bulk_proposals(self):
+    def save_bulk_proposals(self, confirm: bool = True):
         if self.save_bulk_thread is not None and self.save_bulk_thread.isRunning():
             QMessageBox.information(self, APP_NAME, tr("bulk.save_running"))
             return
@@ -1469,17 +1524,18 @@ class MainWindow(QMainWindow):
         if not items:
             return
         counts = self._pending_apply_counts(cover_override=len(items))
-        dialog = ConfirmApplyDialog(
-            self.root_path,
-            counts["covers"],
-            counts["additions"],
-            counts["deletions"],
-            self,
-            slot_moves=counts["slot_moves"],
-            product_updates=counts["product_updates"],
-        )
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+        if confirm:
+            dialog = ConfirmApplyDialog(
+                self.root_path,
+                counts["covers"],
+                counts["additions"],
+                counts["deletions"],
+                self,
+                slot_moves=counts["slot_moves"],
+                product_updates=counts["product_updates"],
+            )
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
         self.apply_after_bulk_save = True
         self.start_busy(tr("bulk.saving"), f"0 / {len(items)}")
         _sbw = SaveBulkWorker(items)
@@ -1527,8 +1583,9 @@ class MainWindow(QMainWindow):
             self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
             self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
             self._update_bulk_save_button_attention(0)
-            self.discard_bulk_button.setEnabled(False)
+            self._update_bulk_delete_button_state()
             self.apply_filters()
+            self._update_save_button_state()
             export_reports(self.games, REPORT_TSV, REPORT_JSON)
             if saved:
                 self.status.setText(tr("bulk.saved_apply", count=saved))
@@ -1558,15 +1615,57 @@ class MainWindow(QMainWindow):
         self.show_error(tr("bulk.save_error", message=message))
 
     def discard_bulk_proposals(self):
+        if not self.bulk_proposals and self._bulk_delete_targets():
+            self.mark_bulk_delete_selected()
+            return
         count = len(self.bulk_proposals)
         self.bulk_proposals.clear()
         self.save_bulk_button.setEnabled(False)
         self.save_bulk_button.setToolTip(tr("filter.save_bulk_tooltip"))
         self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
         self._update_bulk_save_button_attention(0)
-        self.discard_bulk_button.setEnabled(False)
+        self._update_bulk_delete_button_state()
         self.apply_filters()
+        self._update_save_button_state()
         self.status.setText(tr("bulk.discarded", count=count))
+
+    def mark_bulk_delete_selected(self):
+        if not self.ensure_write_allowed():
+            return
+        targets = self._bulk_delete_targets()
+        if not targets:
+            self._update_bulk_delete_button_state()
+            return
+        if not self._confirm_bulk_delete(targets):
+            return
+        for game in targets:
+            game.pending_delete = True
+            game.save_status = "pendiente_eliminar"
+        self.apply_filters()
+        self._update_bulk_delete_button_state()
+        self.status.setText(tr("bulk.delete_marked", count=len(targets)))
+
+    def _confirm_bulk_delete(self, targets: list[GameItem]) -> bool:
+        preview = [f"{game.slot:03d} - {game.name}" for game in targets[:6]]
+        if len(targets) > len(preview):
+            preview.append(tr("bulk.delete_confirm_more", count=len(targets) - len(preview)))
+        full_list = "\n".join(f"{game.slot:03d} - {game.name}" for game in targets)
+        message = QMessageBox(self)
+        message.setWindowTitle(APP_NAME)
+        message.setIcon(QMessageBox.Icon.Question)
+        message.setText(tr("bulk.delete_confirm_title", count=len(targets)))
+        message.setInformativeText(
+            tr(
+                "bulk.delete_confirm_body",
+                preview="\n".join(preview),
+            )
+        )
+        message.setDetailedText(tr("bulk.delete_confirm_details", games=full_list))
+        accept_button = message.addButton(tr("bulk.delete_accept"), QMessageBox.ButtonRole.AcceptRole)
+        cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
+        message.setDefaultButton(cancel_button)
+        message.exec()
+        return message.clickedButton() is accept_button
 
     def _game_by_slot(self, slot: int) -> GameItem | None:
         return self.games_by_slot.get(slot)
@@ -1692,11 +1791,10 @@ class MainWindow(QMainWindow):
                     btn.setEnabled(self.write_allowed and self.has_pending_changes())
                 elif mode == "bulk_mode":
                     btn.setEnabled(self.bulk_mode)
-                elif mode == "bulk_valid":
-                    btn.setEnabled(has_saveable_proposal(self.bulk_proposals))
                 elif mode == "bulk_any":
                     btn.setEnabled(bool(self.bulk_proposals))
         self._update_bulk_save_button_attention()
+        self._update_bulk_delete_button_state()
         self._update_save_button_state()
 
     def change_template(self, template_name: str):

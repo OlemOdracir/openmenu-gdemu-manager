@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..image_qt import file_to_pixmap, pil_to_pixmap
+from ...core.image_quality import NORMALIZED_SIZE
 from ...core.models import BulkProposal, GameItem
 from ...i18n import tr
 from ..theme import template_palette
@@ -54,6 +55,7 @@ def quality_tooltip(game: GameItem) -> str:
         score=game.quality_score,
         width=game.image_width,
         height=game.image_height,
+        target=NORMALIZED_SIZE,
         mode=game.normalization_mode or "-",
     )
 

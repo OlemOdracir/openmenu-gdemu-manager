@@ -31,6 +31,9 @@ def test_scan_prefers_dat_cover_over_legacy_slot_index(monkeypatch, tmp_path):
 
     assert len(games) == 1
     assert games[0].current_cover == dat_cover
+    assert games[0].selected_image == str(dat_cover)
+    assert games[0].original_image == ""
+    assert games[0].selected_source == "openmenu_dat"
     assert games[0].quality_label == "OpenMenu"
     assert games[0].quality_score == 100
     assert games[0].normalization_mode == "openmenu_dat"

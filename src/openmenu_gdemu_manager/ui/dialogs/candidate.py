@@ -9,12 +9,13 @@ from pathlib import Path
 
 from PIL import Image
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QCursor, QLinearGradient, QPainter, QPixmap
+from PySide6.QtGui import QAction, QColor, QCursor, QIcon, QLinearGradient, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
     QGridLayout,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -141,6 +142,7 @@ class _CandidateCard(QFrame):
         self._palette = palette
         self._accepted = is_current
         self._is_current = is_current
+        self._hovered = False
 
         # ── Image (z-order: bottom)
         self._img = QLabel(self)
@@ -214,20 +216,24 @@ class _CandidateCard(QFrame):
             self._sel_btn.setProperty("variant", "success")
             self._sel_btn.setToolTip(tr("dialog.candidate.current_cover"))
             self._sel_btn.setStyleSheet("")
+            self._sel_btn.setVisible(True)
         else:
-            self._sel_btn.setIcon(action_qicon("candidate_pick", "default", 22))
+            self._sel_btn.setIcon(QIcon())
             self._sel_btn.setProperty("variant", "default")
             self._sel_btn.setToolTip(tr("dialog.candidate.select_image"))
             self._sel_btn.setStyleSheet(
                 "QPushButton {"
-                "background: rgba(255, 255, 255, 0.38);"
-                "border: 1px solid rgba(255, 255, 255, 0.7);"
-                "border-radius: 12px;"
+                "background: rgba(255, 255, 255, 0.18);"
+                "border: 3px solid rgba(255, 255, 255, 0.9);"
+                "border-radius: 18px;"
                 "}"
                 "QPushButton:hover {"
-                "background: rgba(255, 255, 255, 0.72);"
+                "background: rgba(255, 255, 255, 0.36);"
+                "border-color: rgba(41, 243, 167, 0.95);"
                 "}"
             )
+            self._sel_btn.setFixedSize(36, 36)
+            self._sel_btn.setVisible(self._hovered)
         self._sel_btn.style().unpolish(self._sel_btn)
         self._sel_btn.style().polish(self._sel_btn)
 
@@ -266,10 +272,14 @@ class _CandidateCard(QFrame):
             super().mousePressEvent(event)
 
     def enterEvent(self, event):
+        self._hovered = True
+        self._apply_button_state()
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         super().enterEvent(event)
 
     def leaveEvent(self, event):
+        self._hovered = False
+        self._apply_button_state()
         self.unsetCursor()
         super().leaveEvent(event)
 
@@ -454,6 +464,7 @@ class CandidateDialog(QDialog):
         _country = _region_country(_r)
         _region_display = f"{region_to_flag(_r)}  {_country}" if _country else (region_to_flag(_r) or _r or "-")
         _meta_row(2, tr("dialog.candidate.game_region"), _region_display)
+        _meta_row(3, tr("dialog.candidate.internal_name"), self.game.internal_name or "-")
         self._name_meta_val: QLabel = QLabel()  # updated on name save
         self._name_meta_val.setObjectName("TileTitle")
         self._name_meta_val.setStyleSheet("font-size: 9pt; font-weight: 700;")
@@ -461,13 +472,13 @@ class CandidateDialog(QDialog):
         name_lbl = QLabel(tr("table.name"))
         name_lbl.setObjectName("MutedLabel")
         name_lbl.setStyleSheet("font-size: 9pt;")
-        meta.addWidget(name_lbl, 3, 0)
-        meta.addWidget(self._name_meta_val, 3, 1)
-        _meta_row(4, tr("table.status"), translate_status(self.game.status))
+        meta.addWidget(name_lbl, 4, 0)
+        meta.addWidget(self._name_meta_val, 4, 1)
+        _meta_row(5, tr("table.status"), translate_status(self.game.status))
         current_quality = self._current_cover_quality_text()
         if current_quality:
-            _meta_row(5, tr("dialog.candidate.resolution"), current_quality[0])
-            _meta_row(6, tr("table.quality"), current_quality[1])
+            _meta_row(6, tr("dialog.candidate.resolution"), current_quality[0])
+            _meta_row(7, tr("table.quality"), current_quality[1])
 
         sl.addLayout(meta)
         sl.addStretch(1)
@@ -500,6 +511,8 @@ class CandidateDialog(QDialog):
         self.save_name_button = action_button(self, "save", tr("dialog.candidate.save_name_tip"), variant="success", label=tr("dialog.candidate.save_name"))
         self.save_name_button.clicked.connect(lambda: self.safe_call(self.save_name))
         search_row.addWidget(self.save_name_button)
+        self._saved_name_text = self.query.text().strip()
+        self.query.textChanged.connect(lambda _text: self._update_save_name_attention())
 
         self.local_button = action_button(self, "local_file", tr("dialog.candidate.local_tip"), label=tr("dialog.candidate.file"))
         self.local_button.clicked.connect(lambda: self.safe_call(self.pick_local))
@@ -582,6 +595,7 @@ class CandidateDialog(QDialog):
         root.addLayout(right, 1)
 
         self._refresh_game_header()
+        self._update_save_name_attention()
         self._update_footer()
 
     # ── Header ────────────────────────────────────────────────────────────────
@@ -611,6 +625,30 @@ class CandidateDialog(QDialog):
             self.status.setText(message or tr("dialog.candidate.searching"))
         else:
             self.search_spinner.stop()
+        self._update_save_name_attention()
+
+    def _update_save_name_attention(self):
+        if not hasattr(self, "save_name_button"):
+            return
+        changed = self.query.text().strip() != getattr(self, "_saved_name_text", "")
+        self.save_name_button.setProperty("attention", "true" if changed and self.save_name_button.isEnabled() else "false")
+        self.save_name_button.setProperty("pulse", "true" if changed and self.save_name_button.isEnabled() else "false")
+        if changed and self.save_name_button.isEnabled():
+            effect = self.save_name_button.graphicsEffect()
+            if not isinstance(effect, QGraphicsDropShadowEffect):
+                effect = QGraphicsDropShadowEffect(self.save_name_button)
+                self.save_name_button.setGraphicsEffect(effect)
+            effect.setBlurRadius(18)
+            effect.setOffset(0, 0)
+            effect.setColor(QColor(41, 243, 167, 150))
+        elif self.save_name_button.graphicsEffect() is not None:
+            self.save_name_button.setGraphicsEffect(None)
+        self._repolish(self.save_name_button)
+
+    def _repolish(self, widget: QWidget):
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
 
     # ── Search ────────────────────────────────────────────────────────────────
 
@@ -807,9 +845,11 @@ class CandidateDialog(QDialog):
             QMessageBox.information(self, APP_NAME, tr("dialog.candidate.name_required"))
             return
         self.game.name = new_name
+        self._saved_name_text = new_name
         self._refresh_game_header()
         self.name_saved.emit(new_name)
         self.status.setText(tr("dialog.candidate.name_saved_status"))
+        self._update_save_name_attention()
 
     def pick_local(self):
         path, _ = QFileDialog.getOpenFileName(self, tr("dialog.candidate.choose_cover"), "", "Images (*.png *.jpg *.jpeg)")

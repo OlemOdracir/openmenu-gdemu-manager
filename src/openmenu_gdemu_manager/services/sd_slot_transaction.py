@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..core.models import GameItem
-from ..dreamcast.metadata import is_synthetic_slot_serial
+from ..dreamcast.metadata import is_synthetic_slot_serial, read_disc_product_id
 from ..dreamcast.sd_writer import copy_game_source, source_size, write_name_txt
 from .sd_registry import registry_dir
 
@@ -291,9 +291,11 @@ class SdSlotTransactionService:
         old_product = game.product_id
         game.slot = new_slot
         game.folder = folder
-        if is_synthetic_slot_serial(game.product_id):
-            game.product_id = f"SLOT{new_slot:03d}"
-            for serial in (old_product, game.product_id):
+        if is_synthetic_slot_serial(game.product_id) or not game.product_id:
+            new_synthetic = f"SLOT{new_slot:03d}"
+            real_product = read_disc_product_id(folder)
+            game.product_id = real_product or new_synthetic
+            for serial in (old_product, new_synthetic, real_product):
                 if serial and serial not in game.artwork_serials:
                     game.artwork_serials.append(serial)
         game.save_status = "pendiente_guardar"

@@ -1,5 +1,10 @@
 import re
+from functools import lru_cache
 from pathlib import Path
+
+IP_BIN_MAGIC = b"SEGA SEGAKATANA"
+IP_BIN_HEADER_SIZE = 0x100
+IP_BIN_SEARCH_LIMIT = 8 * 1024 * 1024
 
 
 def parse_openmenu_ini(path: Path) -> dict[int, dict[str, str]]:
@@ -57,6 +62,20 @@ def find_openmenu_track(root: Path) -> Path:
 
 
 def read_disc_product_id(folder: Path | None) -> str:
+    return _read_first_disc_header_field(folder, _read_ip_bin_product)
+
+
+def read_disc_product_id_from_image(path: Path | None) -> str:
+    if path is None:
+        return ""
+    return _read_ip_bin_product(Path(path))
+
+
+def read_disc_internal_name(folder: Path | None) -> str:
+    return _read_first_disc_header_field(folder, _read_ip_bin_internal_name)
+
+
+def _read_first_disc_header_field(folder: Path | None, reader) -> str:
     if folder is None:
         return ""
     folder = Path(folder)
@@ -68,10 +87,11 @@ def read_disc_product_id(folder: Path | None) -> str:
         candidates.extend(_gdi_data_tracks(folder, gdi))
     candidates.extend(sorted(folder.glob("*.iso")))
     candidates.extend(sorted(folder.glob("*.bin")))
+    candidates.extend(sorted(folder.glob("*.cdi")))
     for candidate in candidates:
-        serial = _read_ip_bin_product(candidate)
-        if serial:
-            return serial
+        value = reader(candidate)
+        if value:
+            return value
     return ""
 
 
@@ -119,14 +139,44 @@ def _gdi_data_tracks(folder: Path, gdi_path: Path) -> list[Path]:
 
 
 def _read_ip_bin_product(track_path: Path) -> str:
-    try:
-        with Path(track_path).open("rb") as handle:
-            header = handle.read(0x60)
-    except OSError:
-        return ""
-    if len(header) < 0x50 or not header.startswith(b"SEGA SEGAKATANA"):
+    header = _read_ip_bin_header(track_path, 0x60)
+    if len(header) < 0x50:
         return ""
     return header[0x40:0x4A].decode("ascii", errors="ignore").strip().replace("-", "")
+
+
+def _read_ip_bin_internal_name(track_path: Path) -> str:
+    header = _read_ip_bin_header(track_path, 0x100)
+    if len(header) < 0x100:
+        return ""
+    return " ".join(header[0x80:0x100].decode("ascii", errors="ignore").split())
+
+
+def _read_ip_bin_header(track_path: Path, size: int) -> bytes:
+    track_path = Path(track_path)
+    try:
+        stat = track_path.stat()
+    except OSError:
+        return b""
+    header = _read_ip_bin_header_cached(str(track_path), stat.st_mtime_ns, stat.st_size)
+    if len(header) < size:
+        return b""
+    return header[:size]
+
+
+@lru_cache(maxsize=512)
+def _read_ip_bin_header_cached(path: str, mtime_ns: int, file_size: int) -> bytes:
+    del mtime_ns
+    read_size = min(max(IP_BIN_HEADER_SIZE, file_size), IP_BIN_SEARCH_LIMIT)
+    try:
+        with Path(path).open("rb") as handle:
+            data = handle.read(read_size)
+    except OSError:
+        return b""
+    start = data.find(IP_BIN_MAGIC)
+    if start < 0:
+        return b""
+    return data[start:start + IP_BIN_HEADER_SIZE]
 
 
 def _normalize_serial(serial: str | None) -> str:

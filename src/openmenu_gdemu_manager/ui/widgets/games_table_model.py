@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..image_qt import file_to_pixmap, pil_to_pixmap
+from ...core.image_quality import NORMALIZED_SIZE
 from ...core.models import BulkProposal, GameItem
 from ...core.placeholder import ensure_no_cover_asset
 from ...config.settings import load_settings, ui_settings
@@ -179,6 +180,7 @@ class GamesTableModel(QAbstractTableModel):
                     f"Proposed quality: {quality.label}\n"
                     f"Quality score: {quality.score}\n"
                     f"Original: {quality.width}x{quality.height}\n"
+                    f"OpenMenu output: {NORMALIZED_SIZE}x{NORMALIZED_SIZE}\n"
                     f"Candidate: {source}{reason}"
                 )
             return quality_tooltip(game)
@@ -192,6 +194,8 @@ class GamesTableModel(QAbstractTableModel):
 
     def _foreground(self, game: GameItem, col: int, proposal) -> QColor | None:
         palette = template_palette()
+        if game.pending_delete and col not in (self.C_COVER, self.C_ACTIONS):
+            return QColor(palette["danger"])
         if col == self.C_STATUS:
             fg_map = {
                 "correcta": palette["success"], "seleccionada": palette["accent"],
@@ -214,6 +218,8 @@ class GamesTableModel(QAbstractTableModel):
 
     def _background(self, game: GameItem, col: int, proposal) -> QColor | None:
         palette = template_palette()
+        if game.pending_delete:
+            return QColor(palette["danger_soft"])
         if col == self.C_STATUS:
             bg_map = {
                 "correcta": palette["success_soft"], "seleccionada": palette["accent_soft"],

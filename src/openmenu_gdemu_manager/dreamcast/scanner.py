@@ -9,6 +9,7 @@ from .metadata import (
     menu_product_id_for_slot,
     parse_openmenu_from_track,
     parse_openmenu_ini,
+    read_disc_internal_name,
     read_disc_product_id,
     read_name_txt,
 )
@@ -63,6 +64,7 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
         name = read_name_txt(folder) or meta.get("name", "") or folder.name
         raw_product_id = meta.get("product", "")
         disc_product_id = read_disc_product_id(folder)
+        internal_name = read_disc_internal_name(folder)
         product_id = menu_product_id_for_slot(slot, raw_product_id, disc_product_id)
         artwork_serials = artwork_serial_candidates(slot, raw_product_id, product_id, disc_product_id)
         cover_index = slot_map.get(slot)
@@ -99,6 +101,7 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
             vga=meta.get("vga", ""),
             version=meta.get("version", ""),
             date=meta.get("date", ""),
+            internal_name=internal_name,
             media_type=detect_media_type(folder),
             folder=folder,
             cover_index=cover_index,
@@ -137,8 +140,13 @@ def _apply_scanned_cover_quality(game: GameItem, cover_path: Path, source: str) 
             warning="Caratula ya normalizada dentro del menu OpenMenu.",
         )
         apply_quality_report(game, normalized_report, source)
+        game.selected_image = str(cover_path)
+        game.original_image = ""
+        game.preview_image = ""
+        game.selected_source = source
         return
     apply_quality_report(game, report, "openmenu_current")
+    game.selected_source = source or "openmenu_current"
 
 
 def analyze_menu_consistency(physical_slots: set[int], metadata: dict[int, dict[str, str]]) -> dict[int, list[str]]:

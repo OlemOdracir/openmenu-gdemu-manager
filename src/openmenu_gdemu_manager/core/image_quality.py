@@ -52,21 +52,21 @@ def analyze_image(image: Image.Image) -> QualityReport:
     if min_side < 200:
         label = "Rechazar"
         base = 15
-        warning = "Resolucion demasiado baja; minimo 200px por lado."
+        warning = "Resolucion demasiado baja para normalizar a 256x256."
         accepted = False
-    elif min_side < 400:
+    elif min_side < 240:
         label = "Baja"
         base = 45
-        warning = "Resolucion baja; se puede usar solo si no hay mejor opcion."
+        warning = "Resolucion baja para OpenMenu; se ampliara hasta 256x256."
         accepted = True
-    elif min_side < 700:
+    elif min_side < NORMALIZED_SIZE:
         label = "Aceptable"
         base = 75
-        warning = ""
+        warning = "Resolucion cercana al limite de OpenMenu; se ampliara levemente."
         accepted = True
     else:
         label = "Alta"
-        base = 92
+        base = 100
         warning = ""
         accepted = True
 
@@ -77,7 +77,7 @@ def analyze_image(image: Image.Image) -> QualityReport:
             warning = "Relacion de aspecto poco usual para caratula."
 
     blur_penalty = 0
-    if sharpness < 8 and min_side >= 400:
+    if sharpness < 8 and min_side >= NORMALIZED_SIZE:
         blur_penalty = 10
         if not warning:
             warning = "La imagen parece blanda o borrosa."

@@ -14,6 +14,18 @@ def _slot(root: Path, number: int, marker: str = "disc.gdi") -> Path:
     return path
 
 
+def _disc_with_product(folder: Path, product: str) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "disc.gdi").write_text(
+        "\n".join(["1", "1 45000 4 2048 track03.iso 0"]),
+        encoding="ascii",
+    )
+    ip = bytearray(0x100)
+    ip[:16] = b"SEGA SEGAKATANA "
+    ip[0x40:0x50] = product.encode("ascii").ljust(0x10, b" ")
+    (folder / "track03.iso").write_bytes(bytes(ip))
+
+
 def test_build_plan_compacts_sparse_slots():
     service = SdSlotTransactionService(Path("H:/"), "op")
     games = [GameItem(slot=2, name="A"), GameItem(slot=3, name="B"), GameItem(slot=5, name="C"), GameItem(slot=6, name="D")]
@@ -67,6 +79,33 @@ def test_execute_adds_from_temporary_copy(tmp_path):
     assert (root / "03" / "disc.cdi").read_text(encoding="ascii") == "new game"
     assert not games[1].pending_add
     assert result.added[0]["new_slot"] == 3
+
+
+def test_execute_add_uses_real_disc_product_before_rebuilding_menu(tmp_path):
+    root = tmp_path / "sd"
+    slot2 = _slot(root, 2)
+    source = tmp_path / "source_game"
+    _disc_with_product(source, "MK51033")
+    games = [
+        GameItem(slot=2, name="A", folder=slot2),
+        GameItem(slot=3, name="Ecco", source_path=str(source), pending_add=True, is_new=True, product_id="SLOT030"),
+    ]
+    service = SdSlotTransactionService(root, "op-add-product")
+
+    result = service.execute(service.build_plan(games), games)
+
+    assert games[1].product_id == "MK51033"
+    assert games[1].artwork_serials == ["SLOT030", "SLOT003", "MK51033"]
+    assert result.product_updates == [
+        {
+            "old_slot": 3,
+            "new_slot": 3,
+            "name": "Ecco",
+            "old_product_id": "SLOT030",
+            "new_product_id": "MK51033",
+            "artwork_aliases": ["SLOT030", "SLOT003", "MK51033"],
+        }
+    ]
 
 
 def test_execute_reorders_without_slot_collisions(tmp_path):
