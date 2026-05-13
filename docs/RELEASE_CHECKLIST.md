@@ -5,6 +5,8 @@
 - Confirm the repository is clean: `git status --short`.
 - Confirm no credentials, ROMs, BIOS files, SD backups, logs or cache files are staged.
 - Run unit tests: `py -m pytest`.
+- Confirm the app version and build version match the intended tag.
+- Confirm `THIRD_PARTY_NOTICES.md` still covers bundled tools and assets.
 - Run public API integration tests when the API changed:
 
 ```powershell
@@ -16,7 +18,7 @@ Remove-Item Env:\OPENMENU_RUN_INTEGRATION
 ## Build and smoke test
 
 ```powershell
-.\scripts\test_release.ps1 -Version 0.1.0-beta.1
+.\scripts\test_release.ps1 -Version 0.2.0-beta.1
 ```
 
 The script validates:
@@ -38,7 +40,22 @@ The script validates:
 - Confirm the setup wizard renders correctly.
 - Confirm online sources show OpenMenu Cover API enabled.
 - Confirm a cover search works.
+- Confirm a clean SD or clean folder can be prepared with an OpenMenu base template.
+- Confirm an existing OpenMenu SD scans and shows covers already stored in the SD DAT files.
+- Confirm save with only cover changes rebuilds OpenMenu and the SD still boots.
+- Confirm save with add/remove game changes compacts slots and the SD still boots.
+- Confirm removed games are moved to `_openmenu_gdemu_manager/trash/`.
+- Confirm `_openmenu_gdemu_manager/transactions.jsonl` records the operation.
+- Confirm Product ID repair prompts do not appear after a clean add/remove/rescan cycle.
 - Confirm no personal paths, credentials or private data appear in screenshots.
+
+## Hardware checks
+
+- Boot OpenMenu on Dreamcast/GDEMU after a rebuild.
+- Confirm the game list appears with expected titles.
+- Confirm covers appear for changed games.
+- Launch at least one existing game and one newly added game.
+- For large operations, rescan the SD on PC after the console test and confirm no coherence warning remains.
 
 ## GitHub release
 
@@ -47,6 +64,8 @@ The script validates:
 - Attach the `.sha256.txt` file.
 - Mark beta builds as prerelease.
 - Mention that the build is unsigned.
+- Mention that users should make a full SD backup before large operations.
+- Mention that the app does not include games, BIOS, OpenMenu distributions or SD images.
 
 ## After release
 

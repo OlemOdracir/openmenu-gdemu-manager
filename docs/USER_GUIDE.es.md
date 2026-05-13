@@ -27,6 +27,8 @@ El asistente muestra tarjetas de estado:
 
 Si la ruta queda bloqueada, la app no habilita acciones de escritura. Esto protege carpetas personales, discos internos y rutas que no parecen una SD GDEMU/OpenMenu.
 
+La carpeta interna `_openmenu_gdemu_manager/` pertenece a la app y se ignora en el diagnostico normal.
+
 ## 4. Administrar caratulas
 
 La app puede buscar caratulas desde:
@@ -38,17 +40,64 @@ La app puede buscar caratulas desde:
 
 La fuente OpenMenu Cover API no requiere que el usuario configure credenciales.
 
-## 5. Aplicar cambios
+Cuando escaneas una SD que ya tiene OpenMenu funcionando, la app intenta leer las caratulas reales desde los archivos DAT del menu. Esas caratulas se extraen a cache local solo para mostrarlas en la interfaz, pero la fuente de verdad sigue siendo la SD.
+
+OpenMenu usa caratulas normalizadas a 256x256. Por eso una imagen original grande se guarda reducida antes de entrar al menu. En la tabla, la calidad indica la utilidad para OpenMenu, no el tamano original maximo de internet.
+
+## 5. Agregar juegos
+
+Usa el boton **Agregar** para seleccionar juegos GDI/CDI o carpetas con juegos.
+
+La app asigna el siguiente slot disponible y marca el juego como pendiente. Nada se copia a la SD hasta presionar **Guardar cambios**.
+
+Cuando se guarda, la app copia el juego, lee el Product ID real cuando es posible, actualiza `name.txt`, reconstruye OpenMenu y registra la operacion.
+
+## 6. Quitar juegos
+
+Puedes marcar un juego para eliminar desde la fila o seleccionar varios juegos y usar la accion masiva de eliminar.
+
+Los juegos no se borran en ese momento. Al presionar **Guardar cambios**, se mueven a la papelera interna:
+
+```text
+_openmenu_gdemu_manager/trash/
+```
+
+Despues de eliminar juegos, la app compacta las carpetas para evitar huecos. Esto es importante porque OpenMenu puede mostrar entradas vacias si existen indices sin su carpeta correspondiente.
+
+## 7. Aplicar cambios
 
 Antes de aplicar cambios:
 
 - revisa el diagnostico;
 - confirma que estas trabajando sobre la SD o respaldo correcto;
-- mantén un respaldo reciente.
+- manten un respaldo reciente.
 
 La app no formatea unidades y no ejecuta reparaciones de disco. Solo modifica archivos relacionados con la administracion OpenMenu/GDEMU cuando la ruta esta permitida.
 
-## 6. Actualizar
+Durante el guardado, la app puede:
+
+- copiar juegos nuevos;
+- mover juegos eliminados a la papelera interna;
+- compactar carpetas numericas;
+- guardar caratulas;
+- reconstruir la carpeta `01` de OpenMenu;
+- crear un backup tecnico automatico de `01`;
+- escribir un log en `_openmenu_gdemu_manager/transactions.jsonl`.
+
+No desconectes la SD ni apagues el PC mientras se aplican cambios.
+
+## 8. Reparaciones sugeridas al escanear
+
+Si la app detecta diferencias entre el menu OpenMenu y las carpetas fisicas, mostrara una alerta. Ejemplos:
+
+- faltan carpetas esperadas;
+- hay carpetas sin entrada en OpenMenu;
+- hay huecos que requieren compactacion;
+- el Product ID del menu no coincide con el disco real.
+
+La opcion **Guardar y reparar ahora** reconstruye el menu y corrige la estructura cuando es posible.
+
+## 9. Actualizar
 
 Al iniciar, la app revisa GitHub Releases. Si hay una version nueva, muestra un aviso y abre la pagina de descarga.
 
