@@ -55,7 +55,7 @@ class GamesTableModel(QAbstractTableModel):
                 return ""
             return tr(self.HEADER_KEYS[section])
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.ToolTipRole and section == self.C_CHECK:
-            return "Seleccionar/deseleccionar todos"
+            return tr("table.select_all_tooltip")
         return None
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
@@ -169,19 +169,21 @@ class GamesTableModel(QAbstractTableModel):
             status = self._status_text(game, proposal)
             text = _status_tooltip(status)
             if proposal and proposal.reason:
-                return f"{text}\nReason: {proposal.reason}"
+                return tr("status.tooltip_with_reason", status=text, reason=proposal.reason)
             return text
         if col == self.C_QUALITY:
             if proposal and proposal.quality is not None:
                 quality = proposal.quality
                 source = proposal.candidate.display if proposal.candidate else "-"
-                reason = f"\nMotivo: {proposal.reason}" if proposal.reason else ""
-                return (
-                    f"Proposed quality: {quality.label}\n"
-                    f"Quality score: {quality.score}\n"
-                    f"Original: {quality.width}x{quality.height}\n"
-                    f"OpenMenu output: {NORMALIZED_SIZE}x{NORMALIZED_SIZE}\n"
-                    f"Candidate: {source}{reason}"
+                return tr(
+                    "quality.tooltip_proposed",
+                    label=quality.label,
+                    score=quality.score,
+                    width=quality.width,
+                    height=quality.height,
+                    target=NORMALIZED_SIZE,
+                    candidate=source,
+                    reason=proposal.reason or "-",
                 )
             return quality_tooltip(game)
         if col == self.C_COVER:
@@ -210,6 +212,9 @@ class GamesTableModel(QAbstractTableModel):
         if col == self.C_QUALITY:
             label = getattr(proposal.quality, "label", "") if proposal and proposal.quality else game.quality_label
             fg_map = {
+                "OpenMenu": palette["success"],
+                "Máxima": palette["success"],
+                "Maxima": palette["success"],
                 "Alta": palette["success"], "Aceptable": palette["accent_text"],
                 "Baja": palette["warning"], "Rechazar": palette["danger"],
             }
@@ -234,6 +239,9 @@ class GamesTableModel(QAbstractTableModel):
         if col == self.C_QUALITY:
             label = getattr(proposal.quality, "label", "") if proposal and proposal.quality else game.quality_label
             bg_map = {
+                "OpenMenu": palette["success_soft"],
+                "Máxima": palette["success_soft"],
+                "Maxima": palette["success_soft"],
                 "Alta": palette["success_soft"], "Aceptable": palette["accent_soft"],
                 "Baja": palette["warning_soft"], "Rechazar": palette["danger_soft"],
             }

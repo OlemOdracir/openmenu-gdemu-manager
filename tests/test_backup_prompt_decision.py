@@ -15,10 +15,14 @@ def _window_for_backup_decision(settings=None):
     return window
 
 
-def _diagnostic_for_openmenu_sd(root):
+def _diagnostic_for_openmenu_sd(root, *, include_game_slot=True):
     slot1 = root / "01"
     slot1.mkdir()
     (slot1 / "track05.iso").write_bytes(b"prefix [OPENMENU] openMenu NEODC_1 suffix")
+    if include_game_slot:
+        slot2 = root / "02"
+        slot2.mkdir()
+        (slot2 / "disc.gdi").write_text("game", encoding="ascii")
     return diagnose_storage(root)
 
 
@@ -60,6 +64,14 @@ def test_should_not_suggest_backup_when_local_skip_decision_exists(tmp_path):
     settings = set_backup_decision({"ui": {"backup_decisions": {}}}, diagnostic, "skipped")
 
     assert _window_for_backup_decision(settings)._should_suggest_backup(diagnostic) is False
+
+
+def test_should_not_suggest_backup_when_openmenu_base_has_no_games(tmp_path):
+    sd_root = tmp_path / "sd"
+    sd_root.mkdir()
+    diagnostic = _diagnostic_for_openmenu_sd(sd_root, include_game_slot=False)
+
+    assert _window_for_backup_decision()._should_suggest_backup(diagnostic) is False
 
 
 def test_backup_prompt_finished_writes_local_decision_and_sd_registry(tmp_path, monkeypatch):

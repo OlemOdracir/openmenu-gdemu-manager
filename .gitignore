@@ -14,11 +14,14 @@
 !README.md
 !README.es.md
 !CONTRIBUTING.md
+!AGENTS.md
 !LICENSE
 !SECURITY.md
 !requirements.txt
 !pyproject.toml
 !THIRD_PARTY_NOTICES.md
+!third_party/
+!third_party/**
 !docs/
 !docs/**
 !scripts/
@@ -45,3 +48,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 *.egg-info/
+
+# Local/private agent instructions (never commit)
+AGENTS.local.md

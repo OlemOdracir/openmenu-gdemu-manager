@@ -22,6 +22,7 @@ from ..core.models import GameItem
 from ..dreamcast.openmenu_dat import BOX_ENTRY_SIZE, normalize_dat_serial, read_dat_by_name, update_artwork_dats
 from ..dreamcast.metadata import is_synthetic_slot_serial, read_disc_product_id
 from ..dreamcast.sd_writer import build_openmenu_text
+from .sd_registry import registry_dir
 
 
 class OpenMenuRebuildError(RuntimeError):
@@ -43,6 +44,9 @@ class OpenMenuRebuildResult:
     staging_slot: Path
     backup_slot: Path
     num_items: int
+
+
+DEFAULT_BUILDGDI_TIMEOUT_SECONDS = 180
 
 
 class OpenMenuRebuilder:
@@ -104,6 +108,42 @@ class OpenMenuRebuilder:
         validate_rebuilt_slot(output_slot, expected_items=len(games))
         return output_slot
 
+    def prepare_empty_base(self, staging_root: Path) -> Path:
+        self._validate_config()
+        staging_root = Path(staging_root)
+        data_dir = staging_root / "data"
+        output_slot = staging_root / "01"
+
+        shutil.copytree(self.config.menu_gdi_dir, output_slot, dirs_exist_ok=True)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        self._complete_missing_menu_data(data_dir)
+        self._copy_base_ip_bin(data_dir)
+        (data_dir / "OPENMENU.INI").write_text(build_openmenu_text([], newline="\r\n"), encoding="latin-1", errors="replace")
+
+        ip_bin = data_dir / "IP.BIN"
+        cdda = output_slot / "track04.raw"
+        gdi = output_slot / "disc.gdi"
+        command = [
+            str(self.config.buildgdi_path),
+            "-data", str(data_dir),
+            "-ip", str(ip_bin),
+            "-cdda", str(cdda),
+            "-output", str(output_slot),
+            "-gdi", str(gdi),
+            "-iso",
+            "-truncate",
+        ]
+        result = _run_buildgdi(command, cwd=staging_root)
+        if result.returncode != 0:
+            raise OpenMenuRebuildError(_command_error("buildgdi fallo al crear OpenMenu base", result))
+
+        obsolete_track03_iso = output_slot / "track03.iso"
+        if obsolete_track03_iso.exists() and "track03.iso" not in self._declared_gdi_files(gdi):
+            obsolete_track03_iso.unlink()
+
+        validate_rebuilt_slot(output_slot, expected_items=0)
+        return output_slot
+
     def replace_slot_01(self, root_path: Path, staging_slot: Path) -> Path:
         root_path = Path(root_path)
         staging_slot = Path(staging_slot)
@@ -113,15 +153,33 @@ class OpenMenuRebuilder:
         validate_rebuilt_slot(staging_slot)
 
         backup_slot = self._backup_slot_01(root_path, current_slot)
+        manager_backup_dir = registry_dir(root_path) / "menu_backups"
+        manager_backup_dir.mkdir(parents=True, exist_ok=True)
+        operation_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        pending_slot = root_path / "01.new"
+        old_slot = manager_backup_dir / f"01.old.{operation_id}"
         try:
-            shutil.rmtree(current_slot)
-            shutil.copytree(staging_slot, current_slot)
+            if pending_slot.exists():
+                shutil.rmtree(pending_slot, ignore_errors=True)
+            shutil.copytree(staging_slot, pending_slot)
+            validate_rebuilt_slot(pending_slot)
+            current_slot.rename(old_slot)
+            pending_slot.rename(current_slot)
             validate_rebuilt_slot(current_slot)
         except Exception as exc:
-            if current_slot.exists():
+            if current_slot.exists() and not (current_slot / "disc.gdi").exists():
                 shutil.rmtree(current_slot, ignore_errors=True)
-            shutil.copytree(backup_slot, current_slot)
+            if not current_slot.exists() and old_slot.exists():
+                old_slot.rename(current_slot)
+            elif current_slot.exists() and old_slot.exists():
+                shutil.rmtree(current_slot, ignore_errors=True)
+                old_slot.rename(current_slot)
+            elif not current_slot.exists():
+                shutil.copytree(backup_slot, current_slot)
             raise OpenMenuRebuildError(f"No se pudo reemplazar 01; se restauro el backup: {backup_slot}") from exc
+        finally:
+            if pending_slot.exists():
+                shutil.rmtree(pending_slot, ignore_errors=True)
         return backup_slot
 
     def _validate_config(self) -> None:
@@ -178,6 +236,19 @@ class OpenMenuRebuilder:
             elif not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, target)
+
+    def _copy_base_ip_bin(self, data_dir: Path) -> None:
+        if (data_dir / "IP.BIN").exists():
+            return
+        candidates = [
+            self.config.menu_gdi_dir.parent / "IP.BIN",
+            self.config.menu_data_dir / "IP.BIN" if self.config.menu_data_dir else None,
+        ]
+        for candidate in candidates:
+            if candidate and candidate.is_file():
+                shutil.copy2(candidate, data_dir / "IP.BIN")
+                return
+        raise OpenMenuRebuildError(f"No se encontro IP.BIN para crear OpenMenu base: {self.config.menu_gdi_dir.parent}")
 
     def _update_artwork(self, data_dir: Path, games: list[GameItem]) -> int:
         updates: dict[str, Path] = {}
@@ -305,13 +376,24 @@ def _append_serial_alias(aliases: list[str], serial: str | None) -> None:
         aliases.append(normalized)
 
 
-def _run_buildgdi(command: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_buildgdi(
+    command: list[str],
+    cwd: Path | None = None,
+    timeout_seconds: int = DEFAULT_BUILDGDI_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
     kwargs = {"capture_output": True, "text": True}
     if cwd:
         kwargs["cwd"] = str(cwd)
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-    return subprocess.run(command, **kwargs)
+    try:
+        return subprocess.run(command, timeout=timeout_seconds, **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        stderr = (exc.stderr or "").strip()
+        timeout_msg = f"buildgdi excedio el tiempo limite ({timeout_seconds}s)."
+        if stderr:
+            timeout_msg = f"{timeout_msg}\n{stderr}"
+        return subprocess.CompletedProcess(command, 124, exc.stdout or "", timeout_msg)
 
 
 def _sha256_file(path: Path) -> str:

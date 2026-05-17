@@ -44,3 +44,23 @@ def test_bundled_buildgdi_uses_pyinstaller_internal_dir(tmp_path, monkeypatch):
         assert reloaded.BUNDLED_BUILDGDI_PATH == buildgdi.resolve()
 
     importlib.reload(paths)
+
+
+def test_bundled_openmenu_uses_pyinstaller_internal_dir(tmp_path, monkeypatch):
+    import openmenu_gdemu_manager.config.paths as paths
+
+    internal = tmp_path / "_internal"
+    openmenu = internal / "third_party" / "openmenu"
+    (openmenu / "menu_gdi").mkdir(parents=True)
+    (openmenu / "menu_data").mkdir()
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(sys, "frozen", True, raising=False)
+        scoped.setattr(sys, "_MEIPASS", str(internal), raising=False)
+        scoped.setattr(sys, "executable", str(tmp_path / "OpenMenuGDEMUManager.exe"))
+
+        reloaded = importlib.reload(paths)
+
+        assert reloaded.BUNDLED_OPENMENU_TOOLS_DIR == openmenu.resolve()
+
+    importlib.reload(paths)

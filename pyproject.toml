@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmenu-gdemu-manager"
-version = "0.1.6"
+version = "0.2.0-beta.1"
 description = "Local Windows manager for Dreamcast OpenMenu/GDEMU games and covers."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 keywords = ["dreamcast", "gdemu", "openmenu", "desktop", "windows"]
 maintainers = [
-  { name = "OpenMenu GDEMU Manager", email = "openmenu.gdemu.manager@gmail.com" },
+  { name = "OpenMenu GDEMU Manager" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -53,6 +53,19 @@ openmenu_gdemu_manager = ["resources/app/*.ico", "resources/app/*.png", "resourc
 
 [tool.setuptools.data-files]
 "third_party/buildgdi" = ["third_party/buildgdi/buildgdi.exe", "third_party/buildgdi/LICENSE-DiscUtilsGD.txt", "third_party/buildgdi/README.md", "third_party/buildgdi/SHA256SUMS.txt"]
+"third_party/openmenu" = ["third_party/openmenu/IP.BIN", "third_party/openmenu/LICENSE-GDMENUCardManager.txt", "third_party/openmenu/README.md"]
+"third_party/openmenu/menu_gdi" = ["third_party/openmenu/menu_gdi/disc.gdi", "third_party/openmenu/menu_gdi/track01.iso", "third_party/openmenu/menu_gdi/track02.raw", "third_party/openmenu/menu_gdi/track03.iso", "third_party/openmenu/menu_gdi/track04.raw"]
+"third_party/openmenu/menu_data" = ["third_party/openmenu/menu_data/1ST_READ.BIN", "third_party/openmenu/menu_data/empty.pvr"]
+"third_party/openmenu/menu_data/font" = ["third_party/openmenu/menu_data/font/basilea.fnt", "third_party/openmenu/menu_data/font/basilea_b.pvr", "third_party/openmenu/menu_data/font/basilea_w.pvr", "third_party/openmenu/menu_data/font/GDMNUFNT.pvr"]
+"third_party/openmenu/menu_data/theme/cust_0" = ["third_party/openmenu/menu_data/theme/cust_0/bg_l.pvr", "third_party/openmenu/menu_data/theme/cust_0/bg_r.pvr", "third_party/openmenu/menu_data/theme/cust_0/theme.ini"]
+"third_party/openmenu/menu_data/theme/cust_1" = ["third_party/openmenu/menu_data/theme/cust_1/bg_l.pvr", "third_party/openmenu/menu_data/theme/cust_1/bg_r.pvr", "third_party/openmenu/menu_data/theme/cust_1/theme.ini"]
+"third_party/openmenu/menu_data/theme/gdmenu" = ["third_party/openmenu/menu_data/theme/gdmenu/bg_l.pvr", "third_party/openmenu/menu_data/theme/gdmenu/bg_r.pvr"]
+"third_party/openmenu/menu_data/theme/gdmenu_shen" = ["third_party/openmenu/menu_data/theme/gdmenu_shen/bg_l.PVR", "third_party/openmenu/menu_data/theme/gdmenu_shen/bg_r.PVR"]
+"third_party/openmenu/menu_data/theme/ntsc_j" = ["third_party/openmenu/menu_data/theme/ntsc_j/bg_j_l.pvr", "third_party/openmenu/menu_data/theme/ntsc_j/bg_j_l_wide.pvr", "third_party/openmenu/menu_data/theme/ntsc_j/bg_j_r.pvr", "third_party/openmenu/menu_data/theme/ntsc_j/bg_j_r_wide.pvr"]
+"third_party/openmenu/menu_data/theme/ntsc_u" = ["third_party/openmenu/menu_data/theme/ntsc_u/bg_u_l.pvr", "third_party/openmenu/menu_data/theme/ntsc_u/bg_u_r.pvr"]
+"third_party/openmenu/menu_data/theme/pal" = ["third_party/openmenu/menu_data/theme/pal/bg_e_l.pvr", "third_party/openmenu/menu_data/theme/pal/bg_e_l_wide.pvr", "third_party/openmenu/menu_data/theme/pal/bg_e_r.pvr", "third_party/openmenu/menu_data/theme/pal/bg_e_r_wide.pvr"]
+"third_party/openmenu/menu_data/theme/shared" = ["third_party/openmenu/menu_data/theme/shared/highlight.pvr", "third_party/openmenu/menu_data/theme/shared/icon_black.pvr", "third_party/openmenu/menu_data/theme/shared/icon_white.pvr"]
+"third_party/openmenu/menu_low_data" = ["third_party/openmenu/menu_low_data/GDEMUNFO.TXT"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

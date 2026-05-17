@@ -25,3 +25,18 @@ This project bundles `buildgdi.exe` v2.1.1 for rebuilding Dreamcast GDI/openMenu
 DiscUtilsGD, the GDI/GD-ROM library used by GDIbuilder, is licensed under the MIT license. The license text is included at:
 
 `third_party/buildgdi/LICENSE-DiscUtilsGD.txt`
+
+## OpenMenu base assets from GDMENUCardManager
+
+This project bundles the minimal OpenMenu menu assets used to prepare folder `01` on a clean FAT32 SD:
+
+- `third_party/openmenu/IP.BIN`
+- `third_party/openmenu/menu_gdi`
+- `third_party/openmenu/menu_data`
+- `third_party/openmenu/menu_low_data`
+
+Source: https://github.com/sonik-br/GDMENUCardManager
+
+GDMENUCardManager is licensed under GPL-3.0. OpenMenu GDEMU Manager is also GPL-3.0-or-later, so these assets are distributed under compatible terms. The full GPL-3.0 license text from GDMENUCardManager is included at:
+
+`third_party/openmenu/LICENSE-GDMENUCardManager.txt`

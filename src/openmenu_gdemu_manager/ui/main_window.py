@@ -36,6 +36,7 @@ from .dialogs import (
     AboutDialog, AddGameDialog, BackupPromptDialog, BulkProgressDialog, CandidateDialog, ConfirmApplyDialog,
     CoverPreviewDialog, LanguageSelectionDialog, ProviderSettingsDialog, SetupWizardDialog,
 )
+from .dialogs.setup_wizard import _has_user_backup_content
 from ..core.image_quality import NORMALIZATION_MODE, analyze_image, apply_quality_report
 from ..core.models import BulkProposal, Candidate, GameItem, RomLibraryEntry, VALID_STATES
 from ..config.paths import (
@@ -768,33 +769,46 @@ class MainWindow(QMainWindow):
             return False
         self.stop_busy()
         tx_dir = transactions[0]
+        self.write_allowed = False
+        self.read_only_reason = tr("slot_recovery.pending")
         message = QMessageBox(self)
         message.setWindowTitle(APP_NAME)
         message.setIcon(QMessageBox.Icon.Warning)
         message.setText(tr("slot_recovery.title"))
-        message.setInformativeText(tr("slot_recovery.body", path=tx_dir))
-        complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
-        revert = message.addButton(tr("slot_recovery.revert"), QMessageBox.ButtonRole.DestructiveRole)
+        service = SdSlotTransactionService(self.root_path, tx_dir.name)
+        can_auto_recover = service.can_auto_recover()
+        if can_auto_recover:
+            message.setInformativeText(tr("slot_recovery.body", path=tx_dir))
+        else:
+            message.setInformativeText(tr("slot_recovery.corrupt_body", path=tx_dir))
+        complete = None
+        revert = None
+        if can_auto_recover:
+            complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+            revert = message.addButton(tr("slot_recovery.revert"), QMessageBox.ButtonRole.DestructiveRole)
         open_folder = message.addButton(tr("slot_recovery.open_folder"), QMessageBox.ButtonRole.ActionRole)
         later = message.addButton(tr("slot_recovery.later"), QMessageBox.ButtonRole.RejectRole)
-        message.setDefaultButton(complete)
+        message.setDefaultButton(complete or later)
         message.exec()
         clicked = message.clickedButton()
-        service = SdSlotTransactionService(self.root_path, tx_dir.name)
         try:
-            if clicked is complete:
+            if complete is not None and clicked is complete:
                 service.complete_from_state()
                 self.status.setText(tr("slot_recovery.completed"))
                 self.start_scan()
-            elif clicked is revert:
+            elif revert is not None and clicked is revert:
                 service.revert_from_state()
                 self.status.setText(tr("slot_recovery.reverted"))
                 self.start_scan()
             elif clicked is open_folder:
                 webbrowser.open(str(tx_dir))
-                self.status.setText(tr("slot_recovery.pending"))
+                self.status.setText(
+                    tr("slot_recovery.pending_corrupt") if not can_auto_recover else tr("slot_recovery.pending")
+                )
             elif clicked is later:
-                self.status.setText(tr("slot_recovery.pending"))
+                self.status.setText(
+                    tr("slot_recovery.pending_corrupt") if not can_auto_recover else tr("slot_recovery.pending")
+                )
         except Exception as exc:
             self.show_error(tr("slot_recovery.failed", message=exc))
         return True
@@ -1755,7 +1769,7 @@ class MainWindow(QMainWindow):
             return False
         if diagnostic.route_class not in {"gdemu_structure", "local_backup"}:
             return False
-        if not (summary.numeric_dirs or summary.other_entries):
+        if not _has_user_backup_content(diagnostic):
             return False
         root_key = str(diagnostic.root.resolve())
         if root_key in self.backup_suggested_roots:

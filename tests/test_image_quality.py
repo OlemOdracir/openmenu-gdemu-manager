@@ -6,7 +6,7 @@ from openmenu_gdemu_manager.core.image_quality import analyze_image
 def test_openmenu_target_size_is_maximum_useful_quality():
     report = analyze_image(Image.new("RGB", (256, 256), "#3366aa"))
 
-    assert report.label == "Alta"
+    assert report.label == "OpenMenu"
     assert report.score == 100
     assert report.accepted
 
@@ -14,7 +14,7 @@ def test_openmenu_target_size_is_maximum_useful_quality():
 def test_larger_than_openmenu_target_is_not_penalized_by_resolution():
     report = analyze_image(Image.new("RGB", (512, 512), "#3366aa"))
 
-    assert report.label == "Alta"
+    assert report.label == "OpenMenu"
     assert report.score == 100
     assert report.accepted
 

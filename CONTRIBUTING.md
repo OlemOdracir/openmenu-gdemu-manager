@@ -6,6 +6,7 @@ Thanks for helping improve OpenMenu GDEMU Manager.
 
 - Use pull requests.
 - Keep changes focused and easy to review.
+- Follow `AGENTS.md` rules for SD safety, rebuild flow, and release checks.
 - Run tests before opening a PR:
 
 ```powershell

@@ -27,6 +27,25 @@ def _bundled_buildgdi_path() -> Path:
 BUNDLED_BUILDGDI_PATH = _bundled_buildgdi_path()
 
 
+def _bundled_openmenu_tools_dir() -> Path:
+    candidates: list[Path] = []
+    pyinstaller_root = getattr(sys, "_MEIPASS", "")
+    if pyinstaller_root:
+        candidates.append(Path(pyinstaller_root) / "third_party" / "openmenu")
+    if getattr(sys, "frozen", False):
+        candidates.append(Path(sys.executable).resolve().parent / "_internal" / "third_party" / "openmenu")
+        candidates.append(Path(sys.executable).resolve().parent / "third_party" / "openmenu")
+    candidates.append(PACKAGE_ROOT / "third_party" / "openmenu")
+    candidates.append(Path(sys.prefix) / "third_party" / "openmenu")
+    for candidate in candidates:
+        if (candidate / "menu_gdi").is_dir() and (candidate / "menu_data").is_dir():
+            return candidate.resolve()
+    return candidates[0].resolve() if candidates else (PACKAGE_ROOT / "third_party" / "openmenu")
+
+
+BUNDLED_OPENMENU_TOOLS_DIR = _bundled_openmenu_tools_dir()
+
+
 def _runtime_root() -> Path:
     configured = os.environ.get("OPENMENU_GDEMU_MANAGER_HOME", "").strip()
     if configured:

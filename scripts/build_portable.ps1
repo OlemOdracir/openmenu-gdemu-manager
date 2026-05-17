@@ -31,6 +31,7 @@ py -m PyInstaller `
   --paths "src" `
   --add-data "src\openmenu_gdemu_manager\resources;openmenu_gdemu_manager\resources" `
   --add-data "third_party\buildgdi;third_party\buildgdi" `
+  --add-data "third_party\openmenu;third_party\openmenu" `
   --distpath $DistRoot `
   --workpath (Join-Path $Root "build\pyinstaller") `
   $Launcher

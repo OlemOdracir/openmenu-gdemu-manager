@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -117,12 +118,21 @@ class SdSlotTransactionService:
             ))
         return SlotTransactionPlan(self.operation_id, entries)
 
+    def can_auto_recover(self) -> bool:
+        try:
+            self._read_plan()
+            self._read_state_strict()
+            return True
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+            return False
+
     def execute(
         self,
         plan: SlotTransactionPlan,
         games: list[GameItem],
         progress: ProgressCallback | None = None,
     ) -> SlotTransactionResult:
+        self._validate_plan_paths(plan)
         self.transaction_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.add_dir.mkdir(parents=True, exist_ok=True)
@@ -143,8 +153,8 @@ class SdSlotTransactionService:
             for entry in plan.deletions:
                 step += 1
                 self._emit(progress, step, total_steps, entry.name, "Moviendo juego eliminado a papelera interna")
-                source = Path(entry.folder)
-                target = self.trash_dir / f"{entry.old_slot:02d}"
+                source = self._path_in_root(Path(entry.folder), "folder origen")
+                target = self._path_in_root(self.trash_dir / f"{entry.old_slot:02d}", "papelera interna")
                 if source.exists():
                     if target.exists():
                         raise FileExistsError(f"Ya existe papelera para slot {entry.old_slot:03d}: {target}")
@@ -156,8 +166,8 @@ class SdSlotTransactionService:
             for entry in plan.moves:
                 step += 1
                 self._emit(progress, step, total_steps, entry.name, "Moviendo carpeta a temporal")
-                source = Path(entry.folder)
-                temp = self.temp_dir / f"{entry.old_slot:02d}"
+                source = self._path_in_root(Path(entry.folder), "folder origen")
+                temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
                 if source.exists():
                     if temp.exists():
                         raise FileExistsError(f"Ya existe temporal para slot {entry.old_slot:03d}: {temp}")
@@ -169,13 +179,14 @@ class SdSlotTransactionService:
                 step += 1
                 self._emit(progress, step, total_steps, entry.name, "Copiando juego nuevo a temporal")
                 source_path = Path(entry.source_path)
-                temp = self.add_dir / f"{entry.new_slot:02d}"
+                temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
                 if temp.exists():
                     shutil.rmtree(temp)
                 copy_game_source(source_path, temp)
                 self._verify_copied_source(source_path, temp)
             self._write_state("added_to_temp", deleted=deleted, temp_slots=sorted(temp_by_old_slot))
 
+            created_slots: list[int] = []
             for entry in plan.moves:
                 game = game_by_old_slot[int(entry.old_slot)]
                 temp = temp_by_old_slot[int(entry.old_slot)]
@@ -190,7 +201,7 @@ class SdSlotTransactionService:
 
             for entry in plan.additions:
                 game = game_by_old_slot[int(entry.old_slot)]
-                temp = self.add_dir / f"{entry.new_slot:02d}"
+                temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
                 target = self._slot_folder(int(entry.new_slot))
                 if target.exists():
                     raise FileExistsError(f"El slot destino ya existe: {target}")
@@ -200,16 +211,29 @@ class SdSlotTransactionService:
                 game.is_new = False
                 game.has_placeholder_cover = game.has_placeholder_cover and Path(game.current_cover or "").exists()
                 added.append(entry.to_dict())
+                created_slots.append(int(entry.new_slot))
                 if update:
                     product_updates.append(update)
 
-            self._write_state("moved_to_final", deleted=deleted, moved=moved, added=added)
+            self._write_state(
+                "moved_to_final",
+                deleted=deleted,
+                moved=moved,
+                added=added,
+                created_slots=sorted(created_slots),
+            )
 
             for game in [item for item in games if not item.pending_delete]:
                 if game.folder:
                     write_name_txt(Path(game.folder), game.name)
 
-            self._write_state("completed", deleted=deleted, moved=moved, added=added)
+            self._write_state(
+                "completed",
+                deleted=deleted,
+                moved=moved,
+                added=added,
+                created_slots=sorted(created_slots),
+            )
             return SlotTransactionResult(
                 plan=plan,
                 transaction_dir=self.transaction_dir,
@@ -224,22 +248,24 @@ class SdSlotTransactionService:
             raise
 
     def complete_from_state(self) -> None:
+        self._validate_path_containment()
         plan = self._read_plan()
+        self._validate_plan_paths(plan)
         self._write_state("recovering_complete")
         for entry in plan.deletions:
-            source = Path(entry.folder)
-            target = self.trash_dir / f"{entry.old_slot:02d}"
+            source = self._path_in_root(Path(entry.folder), "folder origen")
+            target = self._path_in_root(self.trash_dir / f"{entry.old_slot:02d}", "papelera interna")
             if source.exists() and not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source.rename(target)
         for entry in plan.moves:
-            original = Path(entry.folder)
-            temp = self.temp_dir / f"{entry.old_slot:02d}"
+            original = self._path_in_root(Path(entry.folder), "folder origen")
+            temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
             if original.exists() and not temp.exists():
                 temp.parent.mkdir(parents=True, exist_ok=True)
                 original.rename(temp)
         for entry in plan.additions:
-            temp = self.add_dir / f"{entry.new_slot:02d}"
+            temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
             if not temp.exists():
                 source_path = Path(entry.source_path)
                 temp.parent.mkdir(parents=True, exist_ok=True)
@@ -251,18 +277,23 @@ class SdSlotTransactionService:
             if temp.exists() and not target.exists():
                 temp.rename(target)
         for entry in plan.additions:
-            temp = self.add_dir / f"{entry.new_slot:02d}"
+            temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
             target = self._slot_folder(int(entry.new_slot))
             if temp.exists() and not target.exists():
                 temp.rename(target)
         self._write_state("completed")
 
     def revert_from_state(self) -> None:
+        self._validate_path_containment()
         plan = self._read_plan()
-        state = self._read_state()
+        self._validate_plan_paths(plan)
+        state = self._read_state_strict()
+        created_slots = {
+            int(value) for value in state.get("created_slots", []) if str(value).strip().isdigit()
+        }
         for entry in reversed(plan.entries):
             if entry.action == "move":
-                temp = self.temp_dir / f"{entry.old_slot:02d}"
+                temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
                 original = self._slot_folder(int(entry.old_slot))
                 final = self._slot_folder(int(entry.new_slot))
                 if temp.exists() and not original.exists():
@@ -270,21 +301,21 @@ class SdSlotTransactionService:
                 elif final.exists() and not original.exists():
                     final.rename(original)
             elif entry.action == "delete":
-                trash = self.trash_dir / f"{entry.old_slot:02d}"
+                trash = self._path_in_root(self.trash_dir / f"{entry.old_slot:02d}", "papelera interna")
                 original = self._slot_folder(int(entry.old_slot))
                 if trash.exists() and not original.exists():
                     trash.rename(original)
             elif entry.action == "add":
                 final = self._slot_folder(int(entry.new_slot))
-                temp = self.add_dir / f"{entry.new_slot:02d}"
-                if final.exists():
+                temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
+                if final.exists() and int(entry.new_slot) in created_slots:
                     shutil.rmtree(final)
                 if temp.exists():
                     shutil.rmtree(temp)
         self._write_state("reverted", previous_state=state.get("stage", "unknown"))
 
     def _slot_folder(self, slot: int) -> Path:
-        return self.root_path / f"{slot:02d}"
+        return self._path_in_root(self.root_path / f"{slot:02d}", "slot destino")
 
     def _apply_final_slot(self, game: GameItem, new_slot: int, folder: Path) -> dict[str, Any] | None:
         old_slot = game.slot
@@ -319,7 +350,11 @@ class SdSlotTransactionService:
     def _write_json(self, name: str, payload: dict[str, Any]) -> None:
         path = self.transaction_dir / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        raw = json.dumps(payload, ensure_ascii=False, indent=2)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+            handle.write(raw)
+            tmp_path = Path(handle.name)
+        tmp_path.replace(path)
 
     def _write_state(self, stage: str, **extra: Any) -> None:
         self._write_json("state.json", {"stage": stage, "operation_id": self.operation_id, **extra})
@@ -337,6 +372,34 @@ class SdSlotTransactionService:
         except (OSError, json.JSONDecodeError):
             return {}
 
+    def _read_state_strict(self) -> dict[str, Any]:
+        return json.loads((self.transaction_dir / "state.json").read_text(encoding="utf-8"))
+
+    def _validate_path_containment(self) -> None:
+        self._path_in_root(self.transaction_dir, "directorio de transacción")
+        self._path_in_root(self.temp_dir, "directorio temporal")
+        self._path_in_root(self.add_dir, "directorio temporal de altas")
+        self._path_in_root(self.trash_dir, "papelera interna")
+
+    def _validate_plan_paths(self, plan: SlotTransactionPlan) -> None:
+        self._validate_path_containment()
+        for entry in plan.entries:
+            if entry.old_slot is not None:
+                self._path_in_root(self._slot_folder(int(entry.old_slot)), "slot original")
+            if entry.new_slot is not None:
+                self._path_in_root(self._slot_folder(int(entry.new_slot)), "slot final")
+            if entry.folder:
+                self._path_in_root(Path(entry.folder), "folder del plan")
+
+    def _path_in_root(self, path: Path, label: str) -> Path:
+        root = self.root_path.resolve()
+        resolved = Path(path).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"{label} fuera de la SD: {resolved}") from exc
+        return resolved
+
     @staticmethod
     def _emit(progress: ProgressCallback | None, current: int, total: int, name: str, status: str) -> None:
         if progress is not None:
@@ -353,6 +416,7 @@ def incomplete_slot_transactions(root_path: Path) -> list[Path]:
         try:
             state = json.loads(state_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
+            result.append(tx_dir)
             continue
         if state.get("stage") not in {"completed", "reverted"}:
             result.append(tx_dir)

@@ -10,7 +10,7 @@ def build_pending_game(entry: RomLibraryEntry, slot: int, cover_index: int | Non
     return GameItem(
         slot=slot,
         name=entry.name,
-        product_id=entry.product_id,
+        product_id=entry.product_id or f"SLOT{slot:03d}",
         region=entry.region,
         disc=entry.disc or "1/1",
         vga=entry.vga or "1",

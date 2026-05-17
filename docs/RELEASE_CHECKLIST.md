@@ -65,7 +65,8 @@ The script validates:
 - Mark beta builds as prerelease.
 - Mention that the build is unsigned.
 - Mention that users should make a full SD backup before large operations.
-- Mention that the app does not include games, BIOS, OpenMenu distributions or SD images.
+- Mention that the app does not include games, BIOS, commercial game data or SD images.
+- Mention that the bundled GPL OpenMenu base assets are used only to prepare folder `01`.
 
 ## After release
 

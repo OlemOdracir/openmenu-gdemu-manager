@@ -37,7 +37,7 @@ This beta is not digitally signed. Windows SmartScreen may show a warning the fi
 ## What It Does
 
 - Detects GDEMU/OpenMenu SD structures and local backups.
-- Installs an OpenMenu base into a clean SD folder when the user provides a valid template.
+- Installs an OpenMenu base into a clean FAT32 SD using bundled OpenMenu menu assets.
 - Adds GDI/CDI games into numbered slots.
 - Marks games for removal and moves them to an internal SD trash folder instead of deleting them immediately.
 - Compacts physical game folders from `02` upward so OpenMenu does not show empty slots.
@@ -120,13 +120,7 @@ The app does not format drives, repair filesystems, or run `chkdsk`.
 
 The app rebuilds the OpenMenu menu using a bundled third-party `buildgdi.exe` tool from GDIbuilder, with license notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This is preferred over modifying `track05.iso` in place because OpenMenu data can grow beyond the original fixed block.
 
-The optional "Install OpenMenu base" action expects a user-provided template folder configured in settings. By default it looks for:
-
-```text
-_OpenMenuBuild/01
-```
-
-That folder is intentionally not included in the public repository. Only use files you are allowed to distribute or copy.
+The optional "Install OpenMenu base" action builds folder `01` from bundled OpenMenu menu assets and `buildgdi.exe`. If `openmenu_setup.template_dir` contains a prebuilt `01`, that folder is still accepted as a compatibility override.
 
 ## Cover Sources
 
@@ -154,7 +148,8 @@ These files should not be committed.
 
 ## Beta Limits
 
-- The app does not include games, BIOS files, OpenMenu distributions, or SD card images.
+- The app does not include games, BIOS files, commercial game data, or SD card images.
+- It bundles minimal GPL OpenMenu base assets used only to prepare folder `01`.
 - The app does not format SD cards.
 - The app is unsigned; Windows SmartScreen may warn on first run.
 - Direct ScreenScraper support requires the user's own credentials.
@@ -166,4 +161,4 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Contact
 
-Project contact: openmenu.gdemu.manager@gmail.com
+Project contact: [GitHub Issues](https://github.com/OlemOdracir/openmenu-gdemu-manager/issues)

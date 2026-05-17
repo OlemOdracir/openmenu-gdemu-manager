@@ -44,6 +44,7 @@ Esta beta no esta firmada digitalmente. Windows SmartScreen puede mostrar una ad
 
 - Validacion segura de rutas antes de escribir.
 - Deteccion de estructura GDEMU/OpenMenu.
+- Instalar OpenMenu base en una SD FAT32 limpia usando assets incluidos.
 - Administracion visual de juegos y caratulas.
 - Agregar juegos GDI/CDI a slots numerados.
 - Marcar juegos para eliminar y moverlos a una papelera interna de la SD.
@@ -110,7 +111,8 @@ ScreenScraper directo queda como opcion avanzada para usuarios que quieran confi
 
 ## Limitaciones de la beta
 
-- No incluye juegos, BIOS, distribuciones de OpenMenu ni imagenes de SD.
+- No incluye juegos, BIOS, datos comerciales de juegos ni imagenes de SD.
+- Incluye assets base OpenMenu GPL minimos usados solo para preparar la carpeta `01`.
 - No formatea tarjetas SD.
 - No esta firmada digitalmente; Windows SmartScreen puede mostrar una advertencia.
 - Las pruebas de integracion contra la API publica se omiten por defecto y se ejecutan solo con `OPENMENU_RUN_INTEGRATION=1`.
@@ -124,7 +126,7 @@ ScreenScraper directo queda como opcion avanzada para usuarios que quieran confi
 
 ## Contacto
 
-openmenu.gdemu.manager@gmail.com
+[GitHub Issues](https://github.com/OlemOdracir/openmenu-gdemu-manager/issues)
 
 ## Licencia
 

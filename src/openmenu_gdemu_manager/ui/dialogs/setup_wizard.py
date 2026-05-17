@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import urllib.parse
 import webbrowser
 from html import escape
@@ -370,7 +371,7 @@ class SetupWizardDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        close = _text_button("Cerrar", vendor_qicon("tabler", "x", "default", 22), "default")
+        close = _text_button(tr("action.close"), vendor_qicon("tabler", "x", "default", 22), "default")
         close.clicked.connect(dialog.accept)
         buttons.addWidget(close)
         layout.addLayout(buttons)
@@ -402,31 +403,31 @@ class SetupWizardDialog(QDialog):
         )
         self._update_tiles(diagnostic)
         detail_lines = [
-            ("Ruta", str(diagnostic.root), True),
-            ("Clasificacion", _route_class_label(diagnostic.route_class), False),
-            ("Estado unidad", _health_label(diagnostic.storage_health), False),
-            ("Menu", _menu_label(diagnostic.menu_state), False),
-            ("Lectura permitida", "si" if diagnostic.scan_allowed else "no", False),
-            ("Escritura permitida", "si" if diagnostic.write_allowed else "no", False),
+            (tr("dialog.setup.detail.path"), str(diagnostic.root), True),
+            (tr("dialog.setup.detail.classification"), _route_class_label(diagnostic.route_class), False),
+            (tr("dialog.setup.detail.drive_status"), _health_label(diagnostic.storage_health), False),
+            (tr("dialog.setup.detail.menu"), _menu_label(diagnostic.menu_state), False),
+            (tr("dialog.setup.detail.scan_allowed"), _yes_no(diagnostic.scan_allowed), False),
+            (tr("dialog.setup.detail.write_allowed"), _yes_no(diagnostic.write_allowed), False),
         ]
         if summary is not None:
             detail_lines.extend([
-                ("Dispositivo", _drive_type_label(summary.drive_type), False),
-                ("Filesystem", summary.filesystem or "-", True),
-                ("Carpetas numericas", str(len(summary.numeric_dirs)), True),
-                ("Archivos/carpetas no GDEMU", str(len(summary.other_entries)), True),
+                (tr("dialog.setup.detail.device"), _drive_type_label(summary.drive_type), False),
+                (tr("dialog.setup.detail.filesystem"), summary.filesystem or "-", True),
+                (tr("dialog.setup.detail.numeric_dirs"), str(len(summary.numeric_dirs)), True),
+                (tr("dialog.setup.detail.non_gdemu_entries"), str(len(summary.other_entries)), True),
             ])
             if summary.ignored_entries:
-                detail_lines.append(("Archivos de sistema ignorados", str(len(summary.ignored_entries)), True))
+                detail_lines.append((tr("dialog.setup.detail.ignored_entries"), str(len(summary.ignored_entries)), True))
         if diagnostic.menu is not None and diagnostic.menu.detail:
-            detail_lines.append(("Detalle menu", diagnostic.menu.detail, False))
+            detail_lines.append((tr("dialog.setup.detail.menu_detail"), _menu_detail_text(diagnostic.menu.detail), False))
         self.details.setText(_format_detail_lines(detail_lines))
         self.details_action.setVisible(True)
-        warnings = list(diagnostic.warnings)
+        warnings = [_warning_text(warning) for warning in diagnostic.warnings]
         if diagnostic.prepare_allowed:
-            warnings.append("Preparacion segura: solo se creara la base OpenMenu, no se copiaran juegos.")
+            warnings.append(tr("dialog.setup.warning.prepare_safe"))
         elif not diagnostic.write_allowed:
-            warnings.append("Modo seguro: las acciones de escritura quedan bloqueadas.")
+            warnings.append(tr("dialog.setup.warning.safe_mode"))
         self.warning.setText("\n".join(warnings))
         self.warning.setVisible(bool(warnings))
         decision = backup_decision(self.settings, diagnostic)
@@ -484,12 +485,13 @@ class SetupWizardDialog(QDialog):
         if not _confirm_dialog(
             self,
             tr("dialog.setup.install_confirm"),
+            tr("dialog.setup.install_action"),
         ):
             return
         try:
             self.diagnostic = install_openmenu_base(self.diagnostic.root, load_settings())
         except OpenMenuSetupError as exc:
-            QMessageBox.warning(self, APP_NAME, str(exc))
+            QMessageBox.warning(self, APP_NAME, _setup_error_text(exc))
             self.run_diagnostic()
             return
         self._show_diagnostic(self.diagnostic)
@@ -578,6 +580,7 @@ class SetupWizardDialog(QDialog):
         if not _confirm_dialog(
             self,
             tr("dialog.backup.skip_confirm"),
+            tr("dialog.backup.confirm_skip_action"),
         ):
             return
         self.settings = set_backup_decision(self.settings, self.diagnostic, "skipped")
@@ -597,24 +600,35 @@ def _diagnostic_severity(diagnostic: StorageDiagnostic) -> str:
     return "danger"
 
 
-def _confirm_dialog(parent: QWidget, text: str) -> bool:
+def _confirm_dialog(parent: QWidget, text: str, accept_label: str | None = None) -> bool:
     message = QMessageBox(parent)
     message.setWindowTitle(APP_NAME)
     message.setIcon(QMessageBox.Icon.Information)
     message.setText(text)
-    continue_button = message.addButton(tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
+    continue_button = message.addButton(accept_label or tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
     cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
     message.setDefaultButton(cancel_button)
     message.exec()
     return message.clickedButton() is continue_button
 
 
-def _backup_recommended(diagnostic: StorageDiagnostic) -> bool:
+def _has_user_backup_content(diagnostic: StorageDiagnostic) -> bool:
     summary = diagnostic.summary
     if summary is None:
         return False
-    has_content = bool(summary.numeric_dirs or summary.other_entries)
-    return has_content and diagnostic.route_class in {"gdemu_structure", "local_backup"} and diagnostic.scan_allowed
+    game_slots = [
+        name for name in summary.numeric_dirs
+        if name.isdigit() and int(name) > 1
+    ]
+    return bool(game_slots or summary.other_entries)
+
+
+def _backup_recommended(diagnostic: StorageDiagnostic) -> bool:
+    return (
+        _has_user_backup_content(diagnostic)
+        and diagnostic.route_class in {"gdemu_structure", "local_backup"}
+        and diagnostic.scan_allowed
+    )
 
 
 def _diagnostic_title(diagnostic: StorageDiagnostic) -> str:
@@ -634,7 +648,7 @@ def _diagnostic_title(diagnostic: StorageDiagnostic) -> str:
 
 
 def _diagnostic_message(diagnostic: StorageDiagnostic) -> str:
-    reason = diagnostic.reason.strip()
+    reason = _diagnostic_reason_text(diagnostic.reason)
     if diagnostic.prepare_allowed:
         return (
             tr("dialog.setup.message.prepare")
@@ -653,6 +667,95 @@ def _diagnostic_message(diagnostic: StorageDiagnostic) -> str:
     if diagnostic.write_allowed:
         return f"{reason}\n\n{tr('dialog.setup.message.write_allowed')}"
     return reason
+
+
+_REASON_KEYS = {
+    "La ruta no existe o no es accesible.": "dialog.setup.reason.not_accessible",
+    "La ruta presenta seÃ±ales de corrupcion. La app no intentara reparar ni escribir.": (
+        "dialog.setup.reason.possible_corruption"
+    ),
+    "La ruta presenta senales de corrupcion. La app no intentara reparar ni escribir.": (
+        "dialog.setup.reason.possible_corruption"
+    ),
+    "La ruta parece la raiz de un disco interno. Por seguridad no se usara como SD.": (
+        "dialog.setup.reason.fixed_root"
+    ),
+    "La ruta contiene carpetas de sistema o datos personales. No parece una SD GDEMU.": (
+        "dialog.setup.reason.system_dirs"
+    ),
+    "La ruta esta vacia. Primero se debe instalar OpenMenu base.": "dialog.setup.reason.empty",
+    "No se pudo leer el track openMenu. La app no intentara reparar ni escribir.": (
+        "dialog.setup.reason.openmenu_track_unreadable"
+    ),
+    "Hay demasiadas entradas no numericas junto a la estructura GDEMU.": (
+        "dialog.setup.reason.too_many_non_numeric"
+    ),
+    "OpenMenu compatible detectado.": "dialog.setup.reason.openmenu_compatible",
+    "La estructura se puede leer, pero requiere migrar o actualizar OpenMenu antes de escribir.": (
+        "dialog.setup.reason.migration_required"
+    ),
+    "La estructura tiene slots, pero el menu no es compatible para escritura.": (
+        "dialog.setup.reason.incompatible_menu"
+    ),
+    "La ruta no esta vacia y no tiene estructura GDEMU/OpenMenu.": (
+        "dialog.setup.reason.non_empty_no_gdemu_root"
+    ),
+    "La carpeta no esta vacia y no tiene estructura GDEMU/OpenMenu.": (
+        "dialog.setup.reason.non_empty_no_gdemu_folder"
+    ),
+}
+
+_MENU_DETAIL_KEYS = {
+    "No existe slot 01.": "dialog.setup.menu_detail.no_slot_01",
+    "Bloque [OPENMENU] detectado.": "dialog.setup.menu_detail.openmenu_block",
+    "Bloque [OPENMENU] detectado sin metadata esperada.": "dialog.setup.menu_detail.openmenu_old_block",
+    "Slot 01 detectado sin bloque [OPENMENU].": "dialog.setup.menu_detail.slot_01_without_openmenu",
+    "Slot 01 parece menu GDEMU/gdMenu basico.": "dialog.setup.menu_detail.gdmenu_basic",
+    "Slot 01 existe, pero no tiene menu reconocible.": "dialog.setup.menu_detail.unknown_menu",
+}
+
+
+def _diagnostic_reason_text(reason: str) -> str:
+    value = reason.strip()
+    if not value:
+        return ""
+    if value in _REASON_KEYS:
+        return tr(_REASON_KEYS[value])
+    if value.startswith("No se pudo leer la ruta: "):
+        return tr("dialog.setup.reason.read_failed", message=value.removeprefix("No se pudo leer la ruta: "))
+    match = re.fullmatch(r"La unidad removible usa (.*); GDEMU requiere FAT32\.", value)
+    if match:
+        return tr("dialog.setup.reason.removable_not_fat32", filesystem=match.group(1))
+    return value
+
+
+def _menu_detail_text(detail: str) -> str:
+    value = detail.strip()
+    if not value:
+        return ""
+    if value in _MENU_DETAIL_KEYS:
+        return tr(_MENU_DETAIL_KEYS[value])
+    if value.startswith("No se pudo leer el track openMenu: "):
+        return tr(
+            "dialog.setup.menu_detail.openmenu_track_read_failed",
+            message=value.removeprefix("No se pudo leer el track openMenu: "),
+        )
+    return value
+
+
+def _warning_text(warning: str) -> str:
+    return _diagnostic_reason_text(warning)
+
+
+def _yes_no(value: bool) -> str:
+    return tr("dialog.setup.value.yes") if value else tr("dialog.setup.value.no")
+
+
+def _setup_error_text(error: OpenMenuSetupError) -> str:
+    key = getattr(error, "key", "")
+    if key:
+        return tr(key, **getattr(error, "params", {}))
+    return str(error)
 
 
 def _status_card_name(severity: str) -> str:

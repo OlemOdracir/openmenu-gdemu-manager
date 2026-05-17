@@ -8,6 +8,6 @@ if _SRC_PACKAGE.exists():
     __path__.insert(0, str(_SRC_PACKAGE))
 
 APP_NAME = "OpenMenu GDEMU Manager"
-__version__ = "0.1.0"
+__version__ = "0.2.0-beta.1"
 REPOSITORY_URL = "https://github.com/OlemOdracir/openmenu-gdemu-manager"
-CONTACT_EMAIL = "openmenu.gdemu.manager@gmail.com"
+CONTACT_URL = "https://github.com/OlemOdracir/openmenu-gdemu-manager/issues"

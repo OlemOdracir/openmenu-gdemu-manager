@@ -6,6 +6,7 @@ from typing import Any
 from .paths import (
     BASE_DIR,
     BUNDLED_BUILDGDI_PATH,
+    BUNDLED_OPENMENU_TOOLS_DIR,
     INBOX_NORMALIZED_DIR,
     INBOX_ORIGINALS_DIR,
     LANGUAGES_DIR,
@@ -138,8 +139,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "buildgdi_path": str(BUNDLED_BUILDGDI_PATH),
         "buildgdi_expected_version": "BuildGDI v2.1.1",
         "buildgdi_expected_sha256": "52C0B7388DEFF46652F35F3F26AC8D2E6B29720E06BD7EDE450DAA0DFF0A8C5E",
-        "menu_gdi_dir": r"D:\Proyectos\openmenu-gdemu-lab\external\GDMENUCardManager\src\GDMENUCardManager.Core\tools\openMenu\menu_gdi",
-        "menu_data_dir": r"D:\Proyectos\openmenu-gdemu-lab\external\GDMENUCardManager\src\GDMENUCardManager.Core\tools\openMenu\menu_data",
+        "menu_gdi_dir": str(BUNDLED_OPENMENU_TOOLS_DIR / "menu_gdi"),
+        "menu_data_dir": str(BUNDLED_OPENMENU_TOOLS_DIR / "menu_data"),
         "menu_source_mode": "current_sd",
     },
     "web_search_templates": [
@@ -308,6 +309,9 @@ def configured_buildgdi_expected_sha256(settings: dict[str, Any] | None = None) 
 
 def configured_menu_gdi_dir(settings: dict[str, Any] | None = None) -> Path:
     settings = settings or load_settings()
+    bundled = BUNDLED_OPENMENU_TOOLS_DIR / "menu_gdi"
+    if bundled.is_dir():
+        return bundled
     raw = settings.get("openmenu_setup", {}).get("menu_gdi_dir", "")
     path = Path(str(raw))
     if not path.is_absolute():
@@ -317,6 +321,9 @@ def configured_menu_gdi_dir(settings: dict[str, Any] | None = None) -> Path:
 
 def configured_menu_data_dir(settings: dict[str, Any] | None = None) -> Path:
     settings = settings or load_settings()
+    bundled = BUNDLED_OPENMENU_TOOLS_DIR / "menu_data"
+    if bundled.is_dir():
+        return bundled
     raw = settings.get("openmenu_setup", {}).get("menu_data_dir", "")
     path = Path(str(raw))
     if not path.is_absolute():

@@ -65,7 +65,7 @@ def analyze_image(image: Image.Image) -> QualityReport:
         warning = "Resolucion cercana al limite de OpenMenu; se ampliara levemente."
         accepted = True
     else:
-        label = "Alta"
+        label = "OpenMenu"
         base = 100
         warning = ""
         accepted = True

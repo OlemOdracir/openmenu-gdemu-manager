@@ -149,3 +149,53 @@ def test_revert_from_state_restores_temp_and_trash(tmp_path):
     assert (root / "02" / "disc.gdi").exists()
     assert (root / "03" / "disc.gdi").exists()
     assert incomplete_slot_transactions(root) == []
+
+
+def test_incomplete_transactions_detect_missing_or_corrupt_state(tmp_path):
+    root = tmp_path / "sd"
+    base = root / "_openmenu_gdemu_manager" / "slot_transactions"
+    missing_state = base / "tx-missing"
+    corrupt_state = base / "tx-corrupt"
+    completed_state = base / "tx-completed"
+    missing_state.mkdir(parents=True)
+    corrupt_state.mkdir(parents=True)
+    completed_state.mkdir(parents=True)
+    (corrupt_state / "state.json").write_text("{broken", encoding="utf-8")
+    (completed_state / "state.json").write_text('{"stage":"completed"}', encoding="utf-8")
+
+    pending = incomplete_slot_transactions(root)
+
+    assert missing_state in pending
+    assert corrupt_state in pending
+    assert completed_state not in pending
+
+
+def test_revert_does_not_delete_untracked_final_slot(tmp_path):
+    root = tmp_path / "sd"
+    service = SdSlotTransactionService(root, "op-revert-safe")
+    source = tmp_path / "src"
+    source.mkdir(parents=True)
+    (source / "disc.cdi").write_text("payload", encoding="ascii")
+    existing_target = _slot(root, 2)
+    game = GameItem(slot=2, name="New", source_path=str(source), pending_add=True, is_new=True, product_id="SLOT002")
+    plan = service.build_plan([game])
+    service.transaction_dir.mkdir(parents=True, exist_ok=True)
+    service._write_json("plan.json", plan.to_dict())
+    service._write_state("moved_to_final", created_slots=[])
+    assert (existing_target / "disc.gdi").exists()
+
+    service.revert_from_state()
+
+    assert (existing_target / "disc.gdi").exists()
+
+
+def test_state_writer_produces_valid_json(tmp_path):
+    root = tmp_path / "sd"
+    service = SdSlotTransactionService(root, "op-state")
+    service.transaction_dir.mkdir(parents=True, exist_ok=True)
+
+    service._write_state("planned", foo="bar")
+
+    data = (service.transaction_dir / "state.json").read_text(encoding="utf-8")
+    assert '"stage": "planned"' in data
+    assert '"foo": "bar"' in data

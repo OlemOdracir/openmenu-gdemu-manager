@@ -49,6 +49,11 @@ def quality_text(game: GameItem) -> str:
 def quality_tooltip(game: GameItem) -> str:
     if not game.quality_label:
         return tr("status.unknown")
+    source = game.selected_source or game.normalization_mode or "unknown"
+    source_key = f"quality.source.{source}" if source != "unknown" else "quality.source.unknown"
+    source_label = tr(source_key)
+    if source_label == source_key:
+        source_label = source
     return tr(
         "quality.tooltip_current",
         label=game.quality_label,
@@ -57,6 +62,7 @@ def quality_tooltip(game: GameItem) -> str:
         height=game.image_height,
         target=NORMALIZED_SIZE,
         mode=game.normalization_mode or "-",
+        source=source_label,
     )
 
 

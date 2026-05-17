@@ -5,7 +5,7 @@ from importlib import metadata
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from ... import APP_NAME, CONTACT_EMAIL, REPOSITORY_URL, __version__
+from ... import APP_NAME, CONTACT_URL, REPOSITORY_URL, __version__
 from ...config.paths import BASE_DIR
 from ...i18n import tr
 from ..icons import app_logo_pixmap
@@ -46,7 +46,7 @@ class AboutDialog(QDialog):
             app=APP_NAME,
             version=app_version(),
             repo=REPOSITORY_URL,
-            contact=CONTACT_EMAIL,
+            contact=CONTACT_URL,
             data_dir=BASE_DIR,
         ))
         body.setWordWrap(True)

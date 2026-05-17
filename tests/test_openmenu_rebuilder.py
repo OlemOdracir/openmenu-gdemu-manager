@@ -1,11 +1,13 @@
 from pathlib import Path
 
 import pytest
+import subprocess
 
 from openmenu_gdemu_manager.services.openmenu_rebuilder import (
     OpenMenuRebuildConfig,
     OpenMenuRebuildError,
     OpenMenuRebuilder,
+    _run_buildgdi,
     _artwork_serial_aliases,
     validate_rebuilt_slot,
 )
@@ -142,3 +144,46 @@ def test_artwork_serial_aliases_include_current_slot_and_disc_product_for_synthe
     game = GameItem(slot=102, name="METAL SLUG 6", product_id="SLOT106", folder=slot)
 
     assert _artwork_serial_aliases(game) == ["SLOT106", "SLOT102", "T0000M"]
+
+
+def test_replace_slot_01_restores_previous_slot_if_final_validation_fails(monkeypatch, tmp_path):
+    root = tmp_path / "sd"
+    current = root / "01"
+    staging = tmp_path / "staging" / "01"
+    _write_valid_slot(current, num_items=3)
+    _write_valid_slot(staging, num_items=3)
+    rebuilder = OpenMenuRebuilder(
+        OpenMenuRebuildConfig(
+            buildgdi_path=tmp_path / "buildgdi.exe",
+            menu_gdi_dir=tmp_path / "menu_gdi",
+            backup_dir=tmp_path / "backups",
+        )
+    )
+    call_counter = {"count": 0}
+    original_validate = validate_rebuilt_slot
+
+    def fail_after_swap(slot_path: Path, expected_items=None):
+        call_counter["count"] += 1
+        if call_counter["count"] == 3:
+            raise OpenMenuRebuildError("forced final validation failure")
+        return original_validate(slot_path, expected_items=expected_items)
+
+    monkeypatch.setattr("openmenu_gdemu_manager.services.openmenu_rebuilder.validate_rebuilt_slot", fail_after_swap)
+
+    with pytest.raises(OpenMenuRebuildError, match="se restauro el backup"):
+        rebuilder.replace_slot_01(root, staging)
+
+    assert (root / "01" / "track05.bin").exists()
+    assert any(path.name.startswith("01-before-rebuild-") for path in (tmp_path / "backups").iterdir())
+
+
+def test_run_buildgdi_returns_timeout_code(monkeypatch):
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["buildgdi"], timeout=1, stderr="hung")
+
+    monkeypatch.setattr("subprocess.run", _timeout)
+
+    result = _run_buildgdi(["buildgdi"], timeout_seconds=1)
+
+    assert result.returncode == 124
+    assert "tiempo limite" in (result.stderr or "")

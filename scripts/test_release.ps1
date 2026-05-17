@@ -35,6 +35,11 @@ $requiredFiles = @(
   (Join-Path $PortableRoot "_internal\third_party\buildgdi\buildgdi.exe"),
   (Join-Path $PortableRoot "_internal\third_party\buildgdi\LICENSE-DiscUtilsGD.txt"),
   (Join-Path $PortableRoot "_internal\third_party\buildgdi\SHA256SUMS.txt"),
+  (Join-Path $PortableRoot "_internal\third_party\openmenu\IP.BIN"),
+  (Join-Path $PortableRoot "_internal\third_party\openmenu\menu_gdi\disc.gdi"),
+  (Join-Path $PortableRoot "_internal\third_party\openmenu\menu_gdi\track01.iso"),
+  (Join-Path $PortableRoot "_internal\third_party\openmenu\menu_data\1ST_READ.BIN"),
+  (Join-Path $PortableRoot "_internal\third_party\openmenu\LICENSE-GDMENUCardManager.txt"),
   $ZipPath,
   $ChecksumPath
 )
@@ -56,7 +61,12 @@ try {
     "THIRD_PARTY_NOTICES.md",
     "_internal/third_party/buildgdi/buildgdi.exe",
     "_internal/third_party/buildgdi/LICENSE-DiscUtilsGD.txt",
-    "_internal/third_party/buildgdi/SHA256SUMS.txt"
+    "_internal/third_party/buildgdi/SHA256SUMS.txt",
+    "_internal/third_party/openmenu/IP.BIN",
+    "_internal/third_party/openmenu/menu_gdi/disc.gdi",
+    "_internal/third_party/openmenu/menu_gdi/track01.iso",
+    "_internal/third_party/openmenu/menu_data/1ST_READ.BIN",
+    "_internal/third_party/openmenu/LICENSE-GDMENUCardManager.txt"
   )) {
     if ($entries -notcontains $entry) {
       throw "ZIP is missing required entry: $entry"

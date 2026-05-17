@@ -26,12 +26,20 @@ Public beta focused on safe OpenMenu/GDEMU SD management from a portable Windows
 ## Known limits
 
 - The app is unsigned; Windows SmartScreen may warn on first launch.
-- The app does not include games, BIOS, OpenMenu distributions or SD images.
+- The app does not include games, BIOS, commercial game data or SD images.
+- It bundles minimal GPL OpenMenu base assets used only to prepare folder `01`.
 - Direct ScreenScraper usage requires the user's own credentials.
 - This is a beta. Keep backups and test changes before relying on one SD as the only copy.
 
 ## Validation
 
-- Unit test suite passes.
-- Public Cover API integration tests pass when enabled with `OPENMENU_RUN_INTEGRATION=1`.
+- `py -m pytest`: 143 passed, 2 skipped.
+- `OPENMENU_RUN_INTEGRATION=1 py -m pytest -m integration`: 2 passed.
+- `scripts/test_release.ps1 -Version 0.2.0-beta.1`: portable ZIP created and executable smoke test passed.
 - Large add/remove/cover rebuild flow has been tested on real Dreamcast/GDEMU hardware.
+
+SHA256:
+
+```text
+F6CDC416C543249C42C999B4701FCBE177143E7E83EAADDA1ABE027E9BE99DAF  OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip
+```

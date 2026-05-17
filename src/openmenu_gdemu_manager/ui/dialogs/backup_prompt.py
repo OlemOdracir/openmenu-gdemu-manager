@@ -230,7 +230,11 @@ class BackupPromptDialog(QDialog):
         QMessageBox.warning(self, APP_NAME, tr("dialog.backup.failed", message=message))
 
     def skip_backup(self):
-        if not _confirm_message(self, tr("dialog.backup.skip_confirm")):
+        if not _confirm_message(
+            self,
+            tr("dialog.backup.skip_confirm"),
+            tr("dialog.backup.confirm_skip_action"),
+        ):
             return
         self.settings = set_backup_decision(self.settings, self.diagnostic, "skipped")
         save_settings(self.settings)
@@ -257,12 +261,12 @@ def _button(text: str, icon_name: str, variant: str) -> QPushButton:
     return button
 
 
-def _confirm_message(parent: QWidget, text: str) -> bool:
+def _confirm_message(parent: QWidget, text: str, accept_label: str | None = None) -> bool:
     message = QMessageBox(parent)
     message.setWindowTitle(APP_NAME)
     message.setIcon(QMessageBox.Icon.Information)
     message.setText(text)
-    continue_button = message.addButton(tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
+    continue_button = message.addButton(accept_label or tr("dialog.backup.continue"), QMessageBox.ButtonRole.AcceptRole)
     cancel_button = message.addButton(tr("action.cancel"), QMessageBox.ButtonRole.RejectRole)
     message.setDefaultButton(cancel_button)
     message.exec()

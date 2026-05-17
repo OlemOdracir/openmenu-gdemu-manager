@@ -2,11 +2,13 @@
 
 ## Reporting Issues
 
-Please report security-sensitive issues privately by email:
+Please report security-sensitive issues through GitHub's private vulnerability reporting when it is available for the repository:
 
-openmenu.gdemu.manager@gmail.com
+https://github.com/OlemOdracir/openmenu-gdemu-manager/security/advisories/new
 
-Do not open a public issue for private credentials, unsafe file-writing behavior, or data-loss reports that include personal paths/logs.
+If private reporting is not available, open a public issue with a minimal description and do not include sensitive logs, personal paths, ROMs, BIOS files, SD backups, or credentials.
+
+Do not post private credentials, unsafe file-writing details that include personal paths/logs, or full data-loss reports publicly.
 
 ## Sensitive Data
 
