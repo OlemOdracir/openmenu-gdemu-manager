@@ -73,7 +73,7 @@ class BulkProgressDialog(QDialog):
         self.detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.detail.setWordWrap(True)
         layout.addWidget(self.detail)
-        self.cancel_button = action_button(self, "discard", tr("action.cancel"), variant="danger", label=tr("action.cancel"))
+        self.cancel_button = action_button(self, "close", tr("action.cancel"), variant="danger", label=tr("action.cancel"))
         self.cancel_button.clicked.connect(self._cancel)
         layout.addWidget(self.cancel_button)
 

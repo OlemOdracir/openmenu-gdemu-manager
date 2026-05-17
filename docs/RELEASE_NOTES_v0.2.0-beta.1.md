@@ -41,5 +41,5 @@ Public beta focused on safe OpenMenu/GDEMU SD management from a portable Windows
 SHA256:
 
 ```text
-F48402AEFDDCDC9DB5EE059CDE86F52F5D8664A72008EEF283B19697B4C19D66  OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip
+D31871563940972B4158D662074F9EE5BCAFDCE46DB162D160CA17E27974DFF5  OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip
 ```
