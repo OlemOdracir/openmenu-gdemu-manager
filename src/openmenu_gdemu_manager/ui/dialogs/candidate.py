@@ -38,6 +38,7 @@ from ...covers.providers.registry import source_provider_id
 from ...config.paths import INBOX_ORIGINALS_DIR
 from ...config.settings import load_settings, web_search_templates
 from ...i18n import tr, translate_status
+from ...services.search_log import append_search_event_for_game
 from ..theme import template_palette
 from ..widgets import action_button, chip_label, region_to_flag, SpinnerLabel
 from ..workers import SearchWorker, start_worker
@@ -587,10 +588,6 @@ class CandidateDialog(QDialog):
         self.next_button.clicked.connect(self._next_page)
         fl.addWidget(self.next_button)
 
-        refresh_btn = action_button(self, "search", tr("dialog.candidate.refresh_search"), variant="accent", label=tr("dialog.candidate.refresh_search"))
-        refresh_btn.clicked.connect(lambda: self.safe_call(self.start_search))
-        fl.addWidget(refresh_btn)
-
         right.addWidget(footer)
         root.addLayout(right, 1)
 
@@ -892,8 +889,13 @@ class CandidateDialog(QDialog):
         if not query:
             return
         templates = web_search_templates(self.settings)
+        log.info("Candidate web search requested: slot=%03d query=%s templates=%d", self.game.slot, query, len(templates))
         if not templates:
-            webbrowser.open("https://www.google.com/search?tbm=isch&q=" + urllib.parse.quote(f"{query} Dreamcast cover art"))
+            self._open_browser_url(
+                "https://www.google.com/search?tbm=isch&q=" + urllib.parse.quote(f"{query} Dreamcast cover art"),
+                "Google Images",
+                query,
+            )
             return
         menu = QMenu(self)
         for template in templates:
@@ -909,7 +911,29 @@ class CandidateDialog(QDialog):
             raw_query=urllib.parse.quote(query),
             product_id=urllib.parse.quote(product_id),
         )
-        webbrowser.open(url)
+        self._open_browser_url(url, template.get("name", "Web"), query)
+
+    def _open_browser_url(self, url: str, label: str, query: str):
+        log.info("Opening candidate web search: slot=%03d query=%s provider=%s url=%s", self.game.slot, query, label, url)
+        opened = webbrowser.open(url)
+        try:
+            search_log_path = append_search_event_for_game(
+                self.game,
+                {
+                    "event": "manual_web_search",
+                    "query": query,
+                    "provider": label,
+                    "url": url,
+                    "opened": opened,
+                },
+            )
+            if search_log_path is not None:
+                log.info("SD web search log updated: %s", search_log_path)
+        except Exception:
+            log.exception("Could not write SD web search log")
+        if not opened:
+            log.warning("Browser did not accept candidate web search URL: slot=%03d query=%s provider=%s", self.game.slot, query, label)
+            self.status.setText(tr("app.error", message=f"No se pudo abrir el navegador para {label}."))
 
     def safe_call(self, callback):
         try:

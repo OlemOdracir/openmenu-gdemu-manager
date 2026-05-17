@@ -27,6 +27,7 @@ from ..services.cover_service import persist_cover_selection
 from ..services.cover_library import count_new_candidates, load_saved_candidates
 from ..services.game_service import build_pending_game, next_free_slot
 from ..services.openmenu_rebuilder import OpenMenuRebuilder
+from ..services.search_log import append_search_event_for_game, summarize_candidates
 from ..services.sd_slot_transaction import SdSlotTransactionService
 from ..services.transaction_log import append_transaction, new_operation_id
 
@@ -302,13 +303,41 @@ class SearchWorker(QObject):
                 log.exception("Could not read cover library before search")
                 previous = []
             candidates = find_candidates(self.game, self.query, include_remote=True, manual_mode=True)
+            new_count = count_new_candidates(previous, candidates)
+            try:
+                search_log_path = append_search_event_for_game(
+                    self.game,
+                    {
+                        "event": "candidate_search",
+                        "query": self.query,
+                        "result_count": len(candidates),
+                        "new_count": new_count,
+                        "saved_count": len(previous),
+                        "results": summarize_candidates(candidates),
+                    },
+                )
+                if search_log_path is not None:
+                    log.info("SD search log updated: %s", search_log_path)
+            except Exception:
+                log.exception("Could not write SD search log")
             self.finished.emit({
                 "candidates": candidates,
-                "new_count": count_new_candidates(previous, candidates),
+                "new_count": new_count,
                 "saved_count": len(previous),
             })
         except Exception as exc:
             log.exception("SearchWorker failed")
+            try:
+                append_search_event_for_game(
+                    self.game,
+                    {
+                        "event": "candidate_search_error",
+                        "query": self.query,
+                        "error": str(exc),
+                    },
+                )
+            except Exception:
+                log.exception("Could not write failed SD search log")
             self.error.emit(str(exc))
 
 
@@ -425,6 +454,18 @@ class BulkWorker(QObject):
                 summary["processed"] += 1
                 try:
                     candidates = find_candidates(game, game.name, include_remote=True)
+                    try:
+                        append_search_event_for_game(
+                            game,
+                            {
+                                "event": "bulk_candidate_search",
+                                "query": game.name,
+                                "result_count": len(candidates),
+                                "results": summarize_candidates(candidates, limit=5),
+                            },
+                        )
+                    except Exception:
+                        log.exception("Could not write bulk SD search log")
                     candidate = candidates[0] if candidates else None
                     if candidate is None:
                         summary["skipped"] += 1
@@ -455,6 +496,17 @@ class BulkWorker(QObject):
                     self.proposal.emit(BulkProposal(game.slot, candidate, image, quality, status, reason))
                 except Exception as exc:
                     log.exception("Bulk game failed: slot=%03d", game.slot)
+                    try:
+                        append_search_event_for_game(
+                            game,
+                            {
+                                "event": "bulk_candidate_search_error",
+                                "query": game.name,
+                                "error": str(exc),
+                            },
+                        )
+                    except Exception:
+                        log.exception("Could not write failed bulk SD search log")
                     summary["errors"] += 1
                     self.proposal.emit(BulkProposal(game.slot, status="error", reason=str(exc)))
             self.finished.emit(summary)
