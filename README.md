@@ -86,14 +86,14 @@ py -m pytest
 To create a portable build:
 
 ```powershell
-$Version = "0.2.0-beta.1"
+$Version = "0.2.0-beta.2"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
 The output is written to `dist/`:
 
 - `OpenMenuGDEMUManager-Portable/`
-- `OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip` when using the example above
+- `OpenMenuGDEMUManager-0.2.0-beta.2-portable-windows.zip` when using the example above
 
 Portable users should run `OpenMenuGDEMUManager.exe`. The executable keeps settings, logs, cache and generated files inside the portable folder.
 

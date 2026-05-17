@@ -1,6 +1,4 @@
 ﻿import logging
-import json
-import urllib.request
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -14,6 +12,7 @@ from ..core.placeholder import ensure_no_cover_asset
 from ..config.paths import INBOX_NORMALIZED_DIR, INBOX_ORIGINALS_DIR, INBOX_PREVIEW_DIR, STATE_PATH
 from ..dreamcast.scanner import scan_sd_root
 from ..covers.search import best_auto_candidate, find_candidates, load_candidate_image
+from ..covers.providers.base import read_json_url
 from ..covers.providers.registry import provider_threshold, source_provider_id
 from ..config.settings import load_settings
 from ..dreamcast.metadata import find_openmenu_track, parse_openmenu_from_track
@@ -102,15 +101,7 @@ class UpdateCheckWorker(QObject):
 
     def run(self):
         try:
-            request = urllib.request.Request(
-                GITHUB_LATEST_RELEASE_API,
-                headers={
-                    "Accept": "application/vnd.github+json",
-                    "User-Agent": "OpenMenu-GDEMU-Manager",
-                },
-            )
-            with urllib.request.urlopen(request, timeout=6) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            payload = read_json_url(GITHUB_LATEST_RELEASE_API, timeout=6)
             latest = str(payload.get("tag_name") or payload.get("name") or "").lstrip("vV")
             if not latest:
                 self.finished.emit({"ok": False, "reason": "no_release"})

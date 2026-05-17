@@ -67,3 +67,18 @@ def test_remote_bytes_rejects_unexpected_content_type(monkeypatch):
 
     with pytest.raises(base.RemoteContentError):
         base.read_image_url("https://api.example.test/cover.png")
+
+
+def test_remote_bytes_uses_certifi_ssl_context(monkeypatch):
+    seen = {}
+    fake_context = object()
+    monkeypatch.setattr(base, "_default_ssl_context", lambda: fake_context)
+
+    def fake_urlopen(request, timeout, context=None):
+        seen["context"] = context
+        return _FakeResponse(b'{"ok": true}')
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+
+    assert base.read_json_url("https://api.example.test/data") == {"ok": True}
+    assert seen["context"] is fake_context

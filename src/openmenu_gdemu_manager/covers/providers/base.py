@@ -1,4 +1,5 @@
 import json
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -7,6 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from ...config.paths import CACHE_DIR
+
+try:
+    import certifi
+except ImportError:  # pragma: no cover - dependency is declared for packaged builds
+    certifi = None
 
 
 USER_AGENT = "openmenu-cover-manager"
@@ -39,7 +45,7 @@ def read_remote_bytes(
         try:
             _rate_limit(url)
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _urlopen(req, timeout=timeout) as resp:
                 final_url = getattr(resp, "url", "") or getattr(resp, "geturl", lambda: "")()
                 if final_url:
                     _validate_https_url(str(final_url))
@@ -56,6 +62,24 @@ def read_remote_bytes(
                 raise
             time.sleep(0.4 * (attempt + 1))
     raise RemoteContentError(f"No se pudo descargar contenido remoto: {last_error}")
+
+
+def _urlopen(request: urllib.request.Request, timeout: int):
+    context = _default_ssl_context()
+    if context is None:
+        return urllib.request.urlopen(request, timeout=timeout)
+    try:
+        return urllib.request.urlopen(request, timeout=timeout, context=context)
+    except TypeError as exc:
+        if "context" not in str(exc):
+            raise
+        return urllib.request.urlopen(request, timeout=timeout)
+
+
+def _default_ssl_context() -> ssl.SSLContext | None:
+    if certifi is None:
+        return None
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def read_json_url(url: str, timeout: int = 30) -> list | dict:
