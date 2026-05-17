@@ -1,7 +1,11 @@
+from pathlib import Path
+
+import openmenu_gdemu_manager.dreamcast.storage_diagnostics as storage_diagnostics
 from openmenu_gdemu_manager.dreamcast.storage_diagnostics import (
     ROUTE_EMPTY_SAFE,
     MENU_OPENMENU_COMPATIBLE,
     diagnose_storage,
+    recommended_initial_storage_path,
 )
 from openmenu_gdemu_manager.services.setup_service import OpenMenuSetupError, install_openmenu_base
 
@@ -137,3 +141,56 @@ def test_install_openmenu_base_rejects_path_that_is_no_longer_empty(tmp_path):
         assert "no esta vacia" in str(exc)
     else:
         raise AssertionError("Expected OpenMenuSetupError")
+
+
+def test_recommended_initial_storage_path_prefers_compatible_removable(monkeypatch, tmp_path):
+    fallback = tmp_path / "portable"
+    empty = tmp_path / "empty"
+    compatible = tmp_path / "sd"
+    fallback.mkdir()
+    empty.mkdir()
+    slot1 = compatible / "01"
+    slot1.mkdir(parents=True)
+    (slot1 / "track05.iso").write_bytes(b"prefix [OPENMENU] openMenu NEODC_1 suffix")
+    monkeypatch.setattr(storage_diagnostics, "_logical_drive_roots", lambda: [empty, compatible])
+    monkeypatch.setattr(storage_diagnostics, "_drive_type", lambda _root: "removable")
+    monkeypatch.setattr(storage_diagnostics, "_filesystem", lambda _root: "FAT32")
+
+    assert recommended_initial_storage_path(fallback) == compatible
+
+
+def test_recommended_initial_storage_path_uses_empty_removable_before_fallback(monkeypatch, tmp_path):
+    fallback = tmp_path / "portable"
+    empty = tmp_path / "empty"
+    fallback.mkdir()
+    empty.mkdir()
+    monkeypatch.setattr(storage_diagnostics, "_logical_drive_roots", lambda: [empty])
+    monkeypatch.setattr(storage_diagnostics, "_drive_type", lambda _root: "removable")
+    monkeypatch.setattr(storage_diagnostics, "_filesystem", lambda _root: "FAT32")
+
+    assert recommended_initial_storage_path(fallback) == empty
+
+
+def test_recommended_initial_storage_path_uses_fallback_without_removable(monkeypatch, tmp_path):
+    fallback = tmp_path / "portable"
+    fallback.mkdir()
+    monkeypatch.setattr(storage_diagnostics, "_logical_drive_roots", lambda: [])
+
+    assert recommended_initial_storage_path(fallback) == fallback
+
+
+def test_logical_drive_roots_reads_all_windows_drives(monkeypatch):
+    class _Kernel32:
+        @staticmethod
+        def GetLogicalDriveStringsW(_size, buffer):
+            raw = "C:\\\x00E:\\\x00\x00"
+            for index, char in enumerate(raw):
+                buffer[index] = char
+            return len(raw)
+
+    class _Windll:
+        kernel32 = _Kernel32()
+
+    monkeypatch.setattr(storage_diagnostics.ctypes, "windll", _Windll(), raising=False)
+
+    assert storage_diagnostics._logical_drive_roots() == [Path("C:\\"), Path("E:\\")]

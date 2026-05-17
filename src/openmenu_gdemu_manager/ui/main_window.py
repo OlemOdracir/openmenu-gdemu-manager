@@ -59,7 +59,7 @@ from ..config.settings import (
     set_active_template as persist_active_template,
 )
 from ..config.state import load_state, update_game_state
-from ..dreamcast.storage_diagnostics import StorageDiagnostic
+from ..dreamcast.storage_diagnostics import StorageDiagnostic, recommended_initial_storage_path
 from ..services.bulk_service import valid_cover_proposals
 from ..services.backup_service import backup_decision
 from ..services.sd_registry import registered_backup_exists
@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(app_qicon())
         self.resize(1280, 780)
         self.state = load_state(STATE_PATH)
-        self.root_path = Path("H:/") if Path("H:/").exists() else Path.cwd()
+        self.root_path = recommended_initial_storage_path(Path.cwd())
         self.games: list[GameItem] = []
         self.filtered_games: list[GameItem] = []
         self.scan_thread: QThread | None = None

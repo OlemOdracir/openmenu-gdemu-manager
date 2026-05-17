@@ -33,7 +33,7 @@ Public beta focused on safe OpenMenu/GDEMU SD management from a portable Windows
 
 ## Validation
 
-- `py -m pytest`: 143 passed, 2 skipped.
+- `py -m pytest`: 147 passed, 2 skipped.
 - `OPENMENU_RUN_INTEGRATION=1 py -m pytest -m integration`: 2 passed.
 - `scripts/test_release.ps1 -Version 0.2.0-beta.1`: portable ZIP created and executable smoke test passed.
 - Large add/remove/cover rebuild flow has been tested on real Dreamcast/GDEMU hardware.
@@ -41,5 +41,5 @@ Public beta focused on safe OpenMenu/GDEMU SD management from a portable Windows
 SHA256:
 
 ```text
-F6CDC416C543249C42C999B4701FCBE177143E7E83EAADDA1ABE027E9BE99DAF  OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip
+F48402AEFDDCDC9DB5EE059CDE86F52F5D8664A72008EEF283B19697B4C19D66  OpenMenuGDEMUManager-0.2.0-beta.1-portable-windows.zip
 ```

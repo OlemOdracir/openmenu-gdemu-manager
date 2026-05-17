@@ -166,6 +166,28 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
                        "La carpeta no esta vacia y no tiene estructura GDEMU/OpenMenu.", warnings, summary)
 
 
+def recommended_initial_storage_path(fallback: Path | None = None) -> Path:
+    fallback_path = Path(fallback or Path.cwd())
+    removable_roots = [root for root in _logical_drive_roots() if _drive_type(root) == "removable"]
+    diagnostics: list[StorageDiagnostic] = []
+    for root in removable_roots:
+        try:
+            diagnostics.append(diagnose_storage(root))
+        except OSError:
+            continue
+
+    for diagnostic in diagnostics:
+        if diagnostic.write_allowed and diagnostic.route_class == ROUTE_GDEMU_STRUCTURE:
+            return diagnostic.root
+    for diagnostic in diagnostics:
+        if diagnostic.prepare_allowed:
+            return diagnostic.root
+    for diagnostic in diagnostics:
+        if diagnostic.scan_allowed:
+            return diagnostic.root
+    return removable_roots[0] if removable_roots else fallback_path
+
+
 def detect_menu(root: Path) -> MenuDiagnostic:
     slot1 = Path(root) / "01"
     if not slot1.exists():
@@ -245,6 +267,16 @@ def _is_drive_root(path: Path) -> bool:
 
 def _drive_root(path: Path) -> Path:
     return Path(path.anchor) if path.anchor else path
+
+
+def _logical_drive_roots() -> list[Path]:
+    if not hasattr(ctypes, "windll"):
+        return []
+    buffer = ctypes.create_unicode_buffer(512)
+    length = ctypes.windll.kernel32.GetLogicalDriveStringsW(len(buffer), buffer)
+    if not length:
+        return []
+    return [Path(value) for value in buffer[:length].split("\x00") if value]
 
 
 def _drive_type(root: Path) -> str:
