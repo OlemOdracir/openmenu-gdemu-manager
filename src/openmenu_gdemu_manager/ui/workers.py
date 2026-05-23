@@ -32,7 +32,7 @@ from ..services.sd_slot_transaction import SdSlotTransactionService
 from ..services.transaction_log import append_transaction, new_operation_id
 
 log = logging.getLogger(__name__)
-GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/OlemOdracir/openmenu-gdemu-manager/releases/latest"
+GITHUB_RELEASES_API = "https://api.github.com/repos/OlemOdracir/openmenu-gdemu-manager/releases"
 
 
 def start_worker(worker: QObject, thread_attr: str, worker_attr: str, owner,
@@ -119,21 +119,49 @@ class UpdateCheckWorker(QObject):
 
     def run(self):
         try:
-            payload = read_json_url(GITHUB_LATEST_RELEASE_API, timeout=6)
-            latest = str(payload.get("tag_name") or payload.get("name") or "").lstrip("vV")
-            if not latest:
+            payload = read_json_url(GITHUB_RELEASES_API, timeout=6)
+            release = _latest_release_from_payload(payload)
+            if not release:
                 self.finished.emit({"ok": False, "reason": "no_release"})
                 return
+            latest = str(release.get("tag_name") or release.get("name") or "").lstrip("vV")
             self.finished.emit({
                 "ok": True,
                 "current": self.current_version,
                 "latest": latest,
-                "url": str(payload.get("html_url") or REPOSITORY_URL),
-                "newer": _version_tuple(latest) > _version_tuple(self.current_version),
+                "url": str(release.get("html_url") or REPOSITORY_URL),
+                "newer": _version_key(latest) > _version_key(self.current_version),
             })
         except Exception as exc:
             log.exception("Update check failed")
             self.error.emit(str(exc))
+
+
+def _latest_release_from_payload(payload: object) -> dict | None:
+    if isinstance(payload, dict):
+        payload = [payload]
+    if not isinstance(payload, list):
+        return None
+
+    releases: list[dict] = []
+    for item in payload:
+        if not isinstance(item, dict) or item.get("draft"):
+            continue
+        version = str(item.get("tag_name") or item.get("name") or "").lstrip("vV")
+        if version:
+            releases.append(item)
+    if not releases:
+        return None
+    return max(releases, key=lambda item: _version_key(str(item.get("tag_name") or item.get("name") or "")))
+
+
+def _version_key(value: str) -> tuple[tuple[int, ...], int, tuple[int, ...]]:
+    text = str(value).strip().lstrip("vV")
+    base, sep, suffix = text.partition("-")
+    base_parts = _version_tuple(base)
+    suffix_parts = _version_tuple(suffix)
+    stable_rank = 1 if not sep else 0
+    return base_parts, stable_rank, suffix_parts
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:

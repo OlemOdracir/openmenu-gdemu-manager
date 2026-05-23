@@ -55,7 +55,7 @@ Esta beta no esta firmada digitalmente. Windows SmartScreen puede mostrar una ad
 - Busqueda de caratulas mediante fuentes locales y OpenMenu Cover API.
 - Modo portable sin instalador.
 - Interfaz en espanol e ingles.
-- Comprobacion de nuevas versiones desde GitHub Releases.
+- Comprobacion de nuevas versiones desde GitHub Releases, incluyendo betas.
 
 ## Seguridad y respaldos
 
@@ -90,7 +90,7 @@ py -m pytest
 ## Build portable
 
 ```powershell
-$Version = "0.2.0-beta.3"
+$Version = "0.2.0-beta.4"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
@@ -99,7 +99,7 @@ El resultado queda en `dist/`.
 Para validar una release completa:
 
 ```powershell
-$Version = "0.2.0-beta.3"
+$Version = "0.2.0-beta.4"
 .\scripts\test_release.ps1 -Version $Version
 ```
 

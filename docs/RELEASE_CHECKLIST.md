@@ -18,7 +18,7 @@ Remove-Item Env:\OPENMENU_RUN_INTEGRATION
 ## Build and smoke test
 
 ```powershell
-.\scripts\test_release.ps1 -Version 0.2.0-beta.3
+.\scripts\test_release.ps1 -Version 0.2.0-beta.4
 ```
 
 The script validates:

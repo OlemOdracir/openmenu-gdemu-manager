@@ -9,7 +9,7 @@ From a clean checkout:
 ```powershell
 py -m pip install -e ".[dev]"
 py -m pytest
-$Version = "0.2.0-beta.3"
+$Version = "0.2.0-beta.4"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
@@ -22,7 +22,7 @@ Users should launch `OpenMenuGDEMUManager.exe`. The portable executable keeps se
 
 ## Release candidate workflow
 
-For a public beta, prefer a prerelease tag such as `v0.2.0-beta.3`.
+For a public beta, prefer a prerelease tag such as `v0.2.0-beta.4`.
 
 Before publishing:
 
@@ -44,7 +44,7 @@ Do not replace this binary silently. Any upgrade should be tested on a real SD b
 
 ## Updates
 
-The app checks the latest GitHub release on startup. If a newer version exists, it prompts the user and opens the release page so they can download the new portable ZIP.
+The app checks GitHub releases on startup and picks the highest available version, including beta prereleases. If a newer version exists, it prompts the user and opens the release page so they can download the new portable ZIP.
 
 This app does not self-replace its executable. That keeps update behavior simple and avoids writing over a running program.
 

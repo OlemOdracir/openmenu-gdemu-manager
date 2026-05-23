@@ -86,20 +86,20 @@ py -m pytest
 To create a portable build:
 
 ```powershell
-$Version = "0.2.0-beta.3"
+$Version = "0.2.0-beta.4"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
 The output is written to `dist/`:
 
 - `OpenMenuGDEMUManager-Portable/`
-- `OpenMenuGDEMUManager-0.2.0-beta.3-portable-windows.zip` when using the example above
+- `OpenMenuGDEMUManager-0.2.0-beta.4-portable-windows.zip` when using the example above
 
 Portable users should run `OpenMenuGDEMUManager.exe`. The executable keeps settings, logs, cache and generated files inside the portable folder.
 
 ## Updates
 
-On startup, the app checks the latest GitHub release. If a newer version is available, it shows a prompt and opens the release page so the user can download the new portable ZIP.
+On startup, the app checks GitHub releases and picks the highest available version, including beta prereleases. If a newer version is available, it shows a prompt and opens the release page so the user can download the new portable ZIP.
 
 The app does not overwrite or self-replace its executable.
 
