@@ -61,10 +61,17 @@ class BackupWorker(QObject):
 class BackupPromptDialog(QDialog):
     """Explicit backup decision before enabling work on an existing SD."""
 
-    def __init__(self, diagnostic: StorageDiagnostic, parent=None, force: bool = False):
+    def __init__(
+        self,
+        diagnostic: StorageDiagnostic,
+        parent=None,
+        force: bool = False,
+        allow_skip: bool = True,
+    ):
         super().__init__(parent)
         self.diagnostic = diagnostic
         self.force = force
+        self.allow_skip = allow_skip
         self.settings = load_settings()
         self.destination = suggested_backup_dir(diagnostic.root)
         self.backup_thread: QThread | None = None
@@ -134,7 +141,8 @@ class BackupPromptDialog(QDialog):
         layout.addLayout(paths)
         self._refresh_destination()
 
-        warning = QLabel(tr("dialog.backup.warning"))
+        warning_key = "dialog.backup.warning" if self.allow_skip else "dialog.backup.required_warning"
+        warning = QLabel(tr(warning_key))
         warning.setObjectName("ChipWarning")
         warning.setWordWrap(True)
         layout.addWidget(warning)
@@ -153,9 +161,11 @@ class BackupPromptDialog(QDialog):
         self.choose_button.clicked.connect(self.choose_destination)
         buttons.addWidget(self.choose_button)
         buttons.addStretch(1)
-        self.skip_button = _button(tr("dialog.backup.skip"), "alert-triangle", "warning")
-        self.skip_button.clicked.connect(self.skip_backup)
-        buttons.addWidget(self.skip_button)
+        self.skip_button: QPushButton | None = None
+        if self.allow_skip:
+            self.skip_button = _button(tr("dialog.backup.skip"), "alert-triangle", "warning")
+            self.skip_button.clicked.connect(self.skip_backup)
+            buttons.addWidget(self.skip_button)
         self.backup_button = _button(tr("dialog.backup.now"), "device-floppy", "success")
         self.backup_button.clicked.connect(self.start_backup)
         buttons.addWidget(self.backup_button)
@@ -246,7 +256,8 @@ class BackupPromptDialog(QDialog):
             self.progress.setRange(0, 0)
         self.status.setText(message)
         self.choose_button.setEnabled(not busy)
-        self.skip_button.setEnabled(not busy)
+        if self.skip_button is not None:
+            self.skip_button.setEnabled(not busy)
         self.backup_button.setEnabled(not busy)
 
 

@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
 from .. import APP_NAME, REPOSITORY_URL
 from .dialogs import (
     AboutDialog, AddGameDialog, BackupPromptDialog, BulkProgressDialog, CandidateDialog, ConfirmApplyDialog,
-    CoverPreviewDialog, LanguageSelectionDialog, ProviderSettingsDialog, SetupWizardDialog,
+    CoverPreviewDialog, LanguageSelectionDialog, LegacyMenuUpgradeDialog, ProviderSettingsDialog, SetupWizardDialog,
 )
 from .dialogs.setup_wizard import _has_user_backup_content
 from ..core.image_quality import NORMALIZATION_MODE, analyze_image, apply_quality_report
@@ -61,7 +61,7 @@ from ..config.settings import (
 from ..config.state import load_state, update_game_state
 from ..dreamcast.storage_diagnostics import StorageDiagnostic, recommended_initial_storage_path
 from ..services.bulk_service import valid_cover_proposals
-from ..services.backup_service import backup_decision
+from ..services.backup_service import backup_decision, set_backup_decision
 from ..services.sd_registry import registered_backup_exists
 from ..services.cover_service import persist_cover_selection
 from ..services.game_service import build_pending_game, next_free_slot
@@ -78,7 +78,7 @@ from .widgets import (
     region_to_flag, StatusIconDelegate, ThemeBackgroundWidget,
 )
 from .workers import (
-    AddGamesWorker, BulkWorker, DiagnosticWorker, SaveBulkWorker, SaveChangesWorker, ScanWorker,
+    AddGamesWorker, BulkWorker, DiagnosticWorker, LegacyMenuUpgradeWorker, SaveBulkWorker, SaveChangesWorker, ScanWorker,
     UpdateCheckWorker, start_worker,
 )
 from .dialogs.about import app_version
@@ -186,6 +186,8 @@ class MainWindow(QMainWindow):
         self.scan_worker: ScanWorker | None = None
         self.diagnostic_thread: QThread | None = None
         self.diagnostic_worker: DiagnosticWorker | None = None
+        self.legacy_upgrade_thread: QThread | None = None
+        self.legacy_upgrade_worker: LegacyMenuUpgradeWorker | None = None
         self.add_thread: QThread | None = None
         self.add_worker: AddGamesWorker | None = None
         self.save_thread: QThread | None = None
@@ -726,6 +728,16 @@ class MainWindow(QMainWindow):
             self.status.setText(diagnostic.reason)
             self.open_setup_wizard(diagnostic)
             return
+        if diagnostic.legacy_menu_migratable:
+            self.stop_busy()
+            if not registered_backup_exists(diagnostic.root):
+                self.status.setText(tr("scan.backup_required"))
+                if not self.open_backup_prompt(diagnostic, force=True):
+                    self._block_legacy_menu()
+                    return
+                self.settings = load_settings()
+            self._handle_legacy_menu_upgrade(diagnostic)
+            return
         if self._handle_incomplete_slot_transactions():
             return
         if self._should_suggest_backup(diagnostic):
@@ -812,6 +824,77 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.show_error(tr("slot_recovery.failed", message=exc))
         return True
+
+    def _handle_legacy_menu_upgrade(self, diagnostic: StorageDiagnostic):
+        has_backup = registered_backup_exists(diagnostic.root)
+        dialog = LegacyMenuUpgradeDialog(has_backup, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self._block_legacy_menu()
+            return
+        if dialog.selected_action == LegacyMenuUpgradeDialog.ACTION_BACKUP:
+            self.open_backup_prompt(diagnostic, force=True)
+            self.settings = load_settings()
+            self._handle_legacy_menu_upgrade(diagnostic)
+            return
+        if dialog.selected_action == LegacyMenuUpgradeDialog.ACTION_UPDATE:
+            self._start_legacy_menu_upgrade(diagnostic)
+            return
+        self._block_legacy_menu()
+
+    def _start_legacy_menu_upgrade(self, diagnostic: StorageDiagnostic):
+        if self.legacy_upgrade_thread is not None and self.legacy_upgrade_thread.isRunning():
+            QMessageBox.information(self, APP_NAME, tr("legacy_upgrade.running"))
+            return
+        self.root_path = diagnostic.root
+        self.start_busy(tr("legacy_upgrade.running"), str(diagnostic.root))
+        self.status.setText(tr("legacy_upgrade.running"))
+        _worker = LegacyMenuUpgradeWorker(diagnostic.root)
+        self._start_worker(
+            _worker,
+            "legacy_upgrade_thread", "legacy_upgrade_worker",
+            on_finished=self.legacy_upgrade_finished,
+            on_error=self.legacy_upgrade_error,
+        )
+
+    def legacy_upgrade_finished(self, result):
+        self.stop_busy()
+        QMessageBox.information(
+            self,
+            APP_NAME,
+            tr("legacy_upgrade.success", count=result.num_items, log=result.log_path or ""),
+        )
+        self.write_allowed = result.diagnostic.write_allowed
+        self.read_only_reason = "" if self.write_allowed else result.diagnostic.reason
+        self.backup_suggested_roots.add(str(result.diagnostic.root.resolve()))
+        if not registered_backup_exists(result.diagnostic.root):
+            self.settings = set_backup_decision(self.settings, result.diagnostic, "skipped")
+            save_settings(self.settings)
+        self.status.setText(tr("legacy_upgrade.success_status", count=result.num_items))
+        self.start_scan()
+
+    def legacy_upgrade_error(self, message: str):
+        self.stop_busy()
+        self.write_allowed = False
+        self.read_only_reason = tr("legacy_upgrade.readonly_reason")
+        self._update_save_button_state()
+        self._update_bulk_delete_button_state()
+        self.show_error(tr("legacy_upgrade.failed", message=message))
+
+    def _block_legacy_menu(self):
+        self.write_allowed = False
+        self.read_only_reason = tr("legacy_upgrade.readonly_reason")
+        self.games = []
+        self.filtered_games = []
+        self.games_by_slot = {}
+        self.games_model.set_games([])
+        self.games_model.clear_cache()
+        self.add_game_button.setEnabled(False)
+        self.bulk_button.setEnabled(False)
+        self.save_bulk_button.setEnabled(False)
+        self.discard_bulk_button.setEnabled(False)
+        self._update_save_button_state()
+        self._update_bulk_delete_button_state()
+        self.status.setText(tr("legacy_upgrade.blocked_status"))
 
     def diagnostic_error(self, message: str):
         self.write_allowed = False
@@ -1757,8 +1840,8 @@ class MainWindow(QMainWindow):
         self.open_backup_prompt(self.diagnostic, force=True)
         self.settings = load_settings()
 
-    def open_backup_prompt(self, diagnostic: StorageDiagnostic, force: bool = False) -> bool:
-        dialog = BackupPromptDialog(diagnostic, self, force=force)
+    def open_backup_prompt(self, diagnostic: StorageDiagnostic, force: bool = False, allow_skip: bool = True) -> bool:
+        dialog = BackupPromptDialog(diagnostic, self, force=force, allow_skip=allow_skip)
         return dialog.exec() == QDialog.DialogCode.Accepted
 
     def _should_suggest_backup(self, diagnostic: StorageDiagnostic) -> bool:

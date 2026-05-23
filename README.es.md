@@ -90,7 +90,7 @@ py -m pytest
 ## Build portable
 
 ```powershell
-$Version = "0.2.0-beta.2"
+$Version = "0.2.0-beta.3"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
@@ -99,7 +99,7 @@ El resultado queda en `dist/`.
 Para validar una release completa:
 
 ```powershell
-$Version = "0.2.0-beta.2"
+$Version = "0.2.0-beta.3"
 .\scripts\test_release.ps1 -Version $Version
 ```
 

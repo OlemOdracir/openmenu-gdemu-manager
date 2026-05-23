@@ -144,6 +144,48 @@ class OpenMenuRebuilder:
         validate_rebuilt_slot(output_slot, expected_items=0)
         return output_slot
 
+    def prepare_from_template(self, games: list[GameItem], staging_root: Path) -> Path:
+        self._validate_config()
+        staging_root = Path(staging_root)
+        data_dir = staging_root / "data"
+        output_slot = staging_root / "01"
+        final_games = sorted([game for game in games if not game.pending_delete], key=lambda game: game.slot)
+
+        shutil.copytree(self.config.menu_gdi_dir, output_slot, dirs_exist_ok=True)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        self._complete_missing_menu_data(data_dir)
+        self._copy_base_ip_bin(data_dir)
+        (data_dir / "OPENMENU.INI").write_text(
+            build_openmenu_text(final_games, newline="\r\n"),
+            encoding="latin-1",
+            errors="replace",
+        )
+        self._update_artwork(data_dir, final_games)
+
+        ip_bin = data_dir / "IP.BIN"
+        cdda = output_slot / "track04.raw"
+        gdi = output_slot / "disc.gdi"
+        command = [
+            str(self.config.buildgdi_path),
+            "-data", str(data_dir),
+            "-ip", str(ip_bin),
+            "-cdda", str(cdda),
+            "-output", str(output_slot),
+            "-gdi", str(gdi),
+            "-iso",
+            "-truncate",
+        ]
+        result = _run_buildgdi(command, cwd=staging_root)
+        if result.returncode != 0:
+            raise OpenMenuRebuildError(_command_error("buildgdi fallo al crear OpenMenu desde plantilla", result))
+
+        obsolete_track03_iso = output_slot / "track03.iso"
+        if obsolete_track03_iso.exists() and "track03.iso" not in self._declared_gdi_files(gdi):
+            obsolete_track03_iso.unlink()
+
+        validate_rebuilt_slot(output_slot, expected_items=len(final_games))
+        return output_slot
+
     def replace_slot_01(self, root_path: Path, staging_slot: Path) -> Path:
         root_path = Path(root_path)
         staging_slot = Path(staging_slot)

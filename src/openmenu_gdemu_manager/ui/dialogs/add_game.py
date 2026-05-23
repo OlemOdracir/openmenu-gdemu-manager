@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QDir, Signal
+from PySide6.QtCore import QDir, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -23,11 +23,31 @@ from PySide6.QtWidgets import (
 from ... import APP_NAME
 from ...core.models import GameItem, RomLibraryEntry
 from ...config.settings import supported_media_types
-from ...dreamcast.rom_library import inspect_source
+from ...dreamcast.rom_library import inspect_source, is_gdemu_menu_slot
 from ...i18n import tr
 from ..widgets import action_button
 
 log = logging.getLogger(__name__)
+
+
+def _format_source_path(value: str) -> str:
+    path = Path(value)
+    if path.is_dir():
+        return path.name
+    if path.is_file():
+        return str(Path(path.parent.name) / path.name)
+    parts = path.parts
+    if len(parts) >= 2:
+        return str(Path(parts[-2]) / parts[-1])
+    return value
+
+
+def _readonly_item(value: str, tooltip: str | None = None) -> QTableWidgetItem:
+    item = QTableWidgetItem(value)
+    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+    if tooltip:
+        item.setToolTip(tooltip)
+    return item
 
 
 class AddGameDialog(QDialog):
@@ -87,9 +107,10 @@ class AddGameDialog(QDialog):
         layout.addLayout(actions)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels([tr("table.name"), "Type", "Path", tr("table.status")])
+        self.table.setHorizontalHeaderLabels([tr("table.name"), tr("table.type"), tr("table.path"), tr("table.status")])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -153,6 +174,8 @@ class AddGameDialog(QDialog):
         rejected: list[str] = []
         known_paths = {entry.source_path.lower() for entry in self.entries}
         for path in paths:
+            if is_gdemu_menu_slot(path):
+                continue
             entries = self._inspect_selected_path(path)
             if not entries:
                 rejected.append(str(path))
@@ -202,10 +225,10 @@ class AddGameDialog(QDialog):
     def _refresh_table(self):
         self.table.setRowCount(len(self.entries))
         for row, entry in enumerate(self.entries):
-            self.table.setItem(row, 0, QTableWidgetItem(entry.name))
-            self.table.setItem(row, 1, QTableWidgetItem(entry.media_type))
-            self.table.setItem(row, 2, QTableWidgetItem(entry.source_path))
-            self.table.setItem(row, 3, QTableWidgetItem(tr("dialog.add.exists") if entry.existing_match else tr("dialog.add.new")))
+            self.table.setItem(row, 0, _readonly_item(entry.name))
+            self.table.setItem(row, 1, _readonly_item(entry.media_type))
+            self.table.setItem(row, 2, _readonly_item(_format_source_path(entry.source_path), entry.source_path))
+            self.table.setItem(row, 3, _readonly_item(tr("dialog.add.exists") if entry.existing_match else tr("dialog.add.new")))
         if not self.entries:
             self.status.setText(tr("dialog.add.none"))
         else:

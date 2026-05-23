@@ -6,6 +6,7 @@ from .candidate import CandidateDialog
 from .confirm_apply import ConfirmApplyDialog
 from .cover_preview import CoverPreviewDialog
 from .language_selection import LanguageSelectionDialog
+from .legacy_upgrade import LegacyMenuUpgradeDialog
 from .provider_settings import ProviderSettingsDialog
 from .setup_wizard import SetupWizardDialog
 
@@ -18,6 +19,7 @@ __all__ = [
     "ConfirmApplyDialog",
     "CoverPreviewDialog",
     "LanguageSelectionDialog",
+    "LegacyMenuUpgradeDialog",
     "ProviderSettingsDialog",
     "SetupWizardDialog",
 ]

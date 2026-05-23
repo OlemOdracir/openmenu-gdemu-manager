@@ -9,7 +9,7 @@ From a clean checkout:
 ```powershell
 py -m pip install -e ".[dev]"
 py -m pytest
-$Version = "0.2.0-beta.1"
+$Version = "0.2.0-beta.3"
 .\scripts\build_portable.ps1 -Version $Version
 ```
 
@@ -22,7 +22,7 @@ Users should launch `OpenMenuGDEMUManager.exe`. The portable executable keeps se
 
 ## Release candidate workflow
 
-For a public beta, prefer a prerelease tag such as `v0.2.0-beta.1`.
+For a public beta, prefer a prerelease tag such as `v0.2.0-beta.3`.
 
 Before publishing:
 

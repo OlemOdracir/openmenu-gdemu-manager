@@ -9,9 +9,8 @@ from .metadata import (
     menu_product_id_for_slot,
     parse_openmenu_from_track,
     parse_openmenu_ini,
-    read_disc_internal_name,
     read_disc_product_id,
-    read_name_txt,
+    resolve_game_display_name,
 )
 from .openmenu_dat import BOX_ENTRY_SIZE, DatEntry, extract_dat_cover, read_dat_by_name
 from ..core.image_quality import QualityReport, analyze_image_file, apply_quality_report
@@ -61,10 +60,11 @@ def scan_sd_root(root: Path, state: dict | None = None, ini_path: Path = DEFAULT
         if slot == 1:
             continue
         meta = metadata.get(slot, {})
-        name = read_name_txt(folder) or meta.get("name", "") or folder.name
         raw_product_id = meta.get("product", "")
         disc_product_id = read_disc_product_id(folder)
-        internal_name = read_disc_internal_name(folder)
+        resolved_name = resolve_game_display_name(folder, meta.get("name", ""), slot)
+        name = resolved_name.name
+        internal_name = resolved_name.internal_name
         product_id = menu_product_id_for_slot(slot, raw_product_id, disc_product_id)
         artwork_serials = artwork_serial_candidates(slot, raw_product_id, product_id, disc_product_id)
         cover_index = slot_map.get(slot)

@@ -28,7 +28,7 @@ DEFAULT_MENU_ENTRY = {
     "disc": "1/1",
     "vga": "1",
     "region": "JUE",
-    "version": "V0.2.0-beta.2",
+    "version": "V0.2.0-beta.3",
     "date": "20210609",
     "product": "NEODC_1",
 }

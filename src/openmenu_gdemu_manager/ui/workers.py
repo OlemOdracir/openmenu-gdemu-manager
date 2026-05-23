@@ -25,6 +25,7 @@ from ..dreamcast.storage_diagnostics import diagnose_storage
 from ..services.cover_service import persist_cover_selection
 from ..services.cover_library import count_new_candidates, load_saved_candidates
 from ..services.game_service import build_pending_game, next_free_slot
+from ..services.legacy_menu_upgrade import LegacyMenuUpgradeService
 from ..services.openmenu_rebuilder import OpenMenuRebuilder
 from ..services.search_log import append_search_event_for_game, summarize_candidates
 from ..services.sd_slot_transaction import SdSlotTransactionService
@@ -88,6 +89,23 @@ class DiagnosticWorker(QObject):
             self.finished.emit(diagnose_storage(self.root))
         except Exception as exc:
             log.exception("DiagnosticWorker failed")
+            self.error.emit(str(exc))
+
+
+class LegacyMenuUpgradeWorker(QObject):
+    finished = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, root: Path):
+        super().__init__()
+        self.root = Path(root)
+
+    def run(self):
+        try:
+            log.info("LegacyMenuUpgradeWorker started: %s", self.root)
+            self.finished.emit(LegacyMenuUpgradeService().upgrade(self.root))
+        except Exception as exc:
+            log.exception("Legacy menu upgrade failed")
             self.error.emit(str(exc))
 
 

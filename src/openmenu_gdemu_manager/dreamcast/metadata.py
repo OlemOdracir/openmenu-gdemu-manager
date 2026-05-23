@@ -1,10 +1,30 @@
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 IP_BIN_MAGIC = b"SEGA SEGAKATANA"
 IP_BIN_HEADER_SIZE = 0x100
 IP_BIN_SEARCH_LIMIT = 8 * 1024 * 1024
+MEDIA_NAME_SUFFIXES = {".cdi", ".gdi", ".iso", ".bin"}
+PREFERRED_MEDIA_NAME_SUFFIXES = {".cdi", ".gdi"}
+GENERIC_NAME_TOKENS = {
+    "boot",
+    "data",
+    "disc",
+    "disk",
+    "game",
+    "track",
+}
+
+
+@dataclass(frozen=True)
+class NameResolution:
+    name: str
+    source: str
+    confidence: str
+    internal_name: str = ""
+    media_filename: str = ""
 
 
 def parse_openmenu_ini(path: Path) -> dict[int, dict[str, str]]:
@@ -75,6 +95,49 @@ def read_disc_internal_name(folder: Path | None) -> str:
     return _read_first_disc_header_field(folder, _read_ip_bin_internal_name)
 
 
+def read_disc_internal_name_from_image(path: Path | None) -> str:
+    if path is None:
+        return ""
+    return _read_ip_bin_internal_name(Path(path))
+
+
+def resolve_game_display_name(folder: Path, menu_name: str = "", slot: int = 0) -> NameResolution:
+    folder = Path(folder)
+    folder_name = folder.name
+    name_txt = read_name_txt(folder)
+    if is_descriptive_game_name(name_txt):
+        return NameResolution(name_txt, "name_txt", "high", read_disc_internal_name(folder), "")
+
+    if is_descriptive_game_name(menu_name):
+        return NameResolution(menu_name.strip(), "openmenu", "high", read_disc_internal_name(folder), "")
+
+    internal_name = read_disc_internal_name(folder)
+    media_name = read_descriptive_media_filename(folder)
+    if media_name:
+        return NameResolution(media_name, "media_filename", "medium", internal_name, media_name)
+
+    if is_descriptive_game_name(internal_name):
+        return NameResolution(internal_name, "internal_name", "medium", internal_name, "")
+
+    fallback = folder_name or (f"{slot:03d}" if slot else "")
+    return NameResolution(fallback, "folder", "low", internal_name, "")
+
+
+def read_descriptive_media_filename(folder: Path | None) -> str:
+    if folder is None:
+        return ""
+    folder = Path(folder)
+    if not folder.exists():
+        return ""
+    candidates = _media_name_candidates(folder, PREFERRED_MEDIA_NAME_SUFFIXES)
+    candidates.extend(_media_name_candidates(folder, MEDIA_NAME_SUFFIXES - PREFERRED_MEDIA_NAME_SUFFIXES))
+    for candidate in candidates:
+        stem = _clean_media_stem(candidate.stem)
+        if is_descriptive_game_name(stem):
+            return stem
+    return ""
+
+
 def _read_first_disc_header_field(folder: Path | None, reader) -> str:
     if folder is None:
         return ""
@@ -93,6 +156,37 @@ def _read_first_disc_header_field(folder: Path | None, reader) -> str:
         if value:
             return value
     return ""
+
+
+def _media_name_candidates(folder: Path, suffixes: set[str]) -> list[Path]:
+    try:
+        paths = [path for path in folder.iterdir() if path.is_file() and path.suffix.lower() in suffixes]
+    except OSError:
+        return []
+    return sorted(paths, key=lambda path: (path.suffix.lower() not in PREFERRED_MEDIA_NAME_SUFFIXES, path.name.lower()))
+
+
+def _clean_media_stem(stem: str) -> str:
+    text = stem.replace("_", " ").replace(".", " ").strip()
+    return " ".join(text.split())
+
+
+def is_descriptive_game_name(value: str | None) -> bool:
+    text = " ".join((value or "").strip().split())
+    if not text:
+        return False
+    if text.isdigit():
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", "", text.lower())
+    if not normalized:
+        return False
+    if normalized in GENERIC_NAME_TOKENS:
+        return False
+    if re.fullmatch(r"track\d{1,2}", normalized):
+        return False
+    if re.fullmatch(r"disc\d{0,2}", normalized) or re.fullmatch(r"disk\d{0,2}", normalized):
+        return False
+    return True
 
 
 def is_synthetic_slot_serial(serial: str | None) -> bool:

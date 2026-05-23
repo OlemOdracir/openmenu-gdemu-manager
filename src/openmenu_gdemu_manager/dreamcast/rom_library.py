@@ -5,10 +5,13 @@ from pathlib import Path
 from ..core.matching import normalize
 from .metadata import (
     detect_media_type,
+    is_descriptive_game_name,
     parse_openmenu_ini,
+    read_disc_internal_name_from_image,
     read_disc_product_id,
     read_disc_product_id_from_image,
     read_name_txt,
+    resolve_game_display_name,
 )
 from ..core.models import GameItem, RomLibraryEntry
 from ..config.paths import DEFAULT_INI
@@ -25,6 +28,8 @@ def scan_rom_library(settings: dict, existing_games: list[GameItem]) -> list[Rom
         if not root.exists():
             continue
         for path in root.rglob("*"):
+            if _is_inside_gdemu_menu_slot(path):
+                continue
             entry = inspect_source(path, supported, known)
             if entry is None:
                 continue
@@ -40,15 +45,18 @@ def inspect_source(path: Path, supported: set[str] | None = None, known: dict[st
     supported = supported if supported is not None else {"GDI", "CDI"}
     known = known if known is not None else _known_metadata()
     path = Path(path)
+    if _is_inside_gdemu_menu_slot(path):
+        return None
     if path.is_file():
         suffix = path.suffix.lower()
         if suffix == ".gdi" and "GDI" in supported:
             return _entry_from_folder(path.parent, known)
         if suffix == ".cdi" and "CDI" in supported:
-            metadata = known.get(normalize(path.stem), {})
+            name = _name_from_image_file(path)
+            metadata = known.get(normalize(name), {})
             product_id = metadata.get("product", "") or read_disc_product_id_from_image(path)
             return RomLibraryEntry(
-                name=read_name_txt(path.parent) or path.stem,
+                name=name,
                 media_type="CDI",
                 source_path=str(path),
                 product_id=product_id,
@@ -65,10 +73,13 @@ def inspect_source(path: Path, supported: set[str] | None = None, known: dict[st
 
 
 def _entry_from_folder(folder: Path, known: dict[str, dict[str, str]]) -> RomLibraryEntry | None:
+    if _is_gdemu_menu_slot(folder):
+        return None
     media_type = detect_media_type(folder)
     if media_type not in {"GDI", "CDI"}:
         return None
-    name = read_name_txt(folder) or folder.name
+    slot = int(folder.name) if folder.name.isdigit() else 0
+    name = resolve_game_display_name(folder, "", slot).name
     metadata = known.get(normalize(name), {})
     product_id = metadata.get("product", "") or read_disc_product_id(folder)
     return RomLibraryEntry(
@@ -84,6 +95,19 @@ def _entry_from_folder(folder: Path, known: dict[str, dict[str, str]]) -> RomLib
     )
 
 
+def _name_from_image_file(path: Path) -> str:
+    name_txt = read_name_txt(path.parent)
+    if is_descriptive_game_name(name_txt):
+        return name_txt
+    stem = " ".join(path.stem.replace("_", " ").replace(".", " ").split())
+    if is_descriptive_game_name(stem):
+        return stem
+    internal_name = read_disc_internal_name_from_image(path)
+    if is_descriptive_game_name(internal_name):
+        return internal_name
+    return stem or path.parent.name
+
+
 def _known_metadata() -> dict[str, dict[str, str]]:
     data = parse_openmenu_ini(DEFAULT_INI)
     result: dict[str, dict[str, str]] = {}
@@ -93,4 +117,30 @@ def _known_metadata() -> dict[str, dict[str, str]]:
             continue
         result.setdefault(normalize(name), item)
     return result
+
+
+def _is_inside_gdemu_menu_slot(path: Path) -> bool:
+    path = Path(path)
+    candidates = [path] if path.is_dir() else []
+    candidates.extend(path.parents)
+    return any(_is_gdemu_menu_slot(candidate) for candidate in candidates)
+
+
+def is_gdemu_menu_slot(folder: Path) -> bool:
+    return _is_gdemu_menu_slot(folder)
+
+
+def _is_gdemu_menu_slot(folder: Path) -> bool:
+    folder = Path(folder)
+    if folder.name != "01" or not folder.is_dir():
+        return False
+    try:
+        files = [path.name.lower() for path in folder.iterdir() if path.is_file()]
+    except OSError:
+        return False
+    if any("gdmenu" in name or "openmenu" in name for name in files):
+        return True
+    if "disc.gdi" in files and any(name.startswith("track05.") for name in files):
+        return True
+    return False
 

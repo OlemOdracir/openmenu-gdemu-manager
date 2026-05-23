@@ -81,3 +81,21 @@ def test_scan_marks_games_after_slot_gap_as_pending_repair(monkeypatch, tmp_path
     assert by_slot[2].consistency_warnings == []
     assert by_slot[4].consistency_warnings == ["slot_compaction_needed"]
     assert by_slot[4].save_status == "pendiente_guardar"
+
+
+def test_scan_uses_media_filename_when_menu_name_is_missing(monkeypatch, tmp_path):
+    root = tmp_path / "sd"
+    slot1 = root / "01"
+    slot2 = root / "02"
+    slot1.mkdir(parents=True)
+    slot2.mkdir()
+    (slot1 / "track05.iso").write_bytes(b"[OPENMENU]\n" + b"\x00" * 64)
+    (slot2 / "CRAZY TAXI.gdi").write_text("dummy", encoding="ascii")
+
+    monkeypatch.setattr(scanner, "_load_openmenu_box_entries", lambda root_path, track_path: {})
+    monkeypatch.setattr(scanner, "load_cover_index_map", lambda: ({}, {}))
+    monkeypatch.setattr(scanner, "read_disc_product_id", lambda folder: "")
+
+    games = scan_sd_root(root, state=None, ini_path=tmp_path / "missing.ini")
+
+    assert games[0].name == "CRAZY TAXI"

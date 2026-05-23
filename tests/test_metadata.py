@@ -7,9 +7,11 @@ from openmenu_gdemu_manager.dreamcast.metadata import (
     parse_openmenu_from_track,
     parse_openmenu_ini,
     parse_openmenu_text,
+    read_descriptive_media_filename,
     read_disc_internal_name,
     read_disc_product_id,
     read_name_txt,
+    resolve_game_display_name,
 )
 
 
@@ -211,12 +213,93 @@ def test_apply_state_accepts_saved_product_that_matches_artwork_alias(tmp_path):
     assert game.selected_image == str(cached_cover)
 
 
+def test_apply_state_does_not_override_descriptive_scan_name_with_numeric_saved_name(tmp_path):
+    root = tmp_path / "sd"
+    root.mkdir()
+    state = {
+        "games": {
+            f"{root.resolve()}::006": {
+                "name": "02",
+                "product_id": "T8109N",
+            }
+        }
+    }
+
+    game = GameItem(slot=6, name="RE-VOLT", product_id="T8109N")
+    apply_state(game, state, root)
+
+    assert game.name == "RE-VOLT"
+
+
 def test_read_name_txt_strips_utf8_bom(tmp_path):
     folder = tmp_path / "02"
     folder.mkdir()
     (folder / "name.txt").write_bytes(b"\xef\xbb\xbfDaytona USA\n")
 
     assert read_name_txt(folder) == "Daytona USA"
+
+
+def test_resolve_game_display_name_prefers_name_txt(tmp_path):
+    folder = tmp_path / "02"
+    folder.mkdir()
+    (folder / "name.txt").write_text("Daytona USA\n", encoding="utf-8")
+    (folder / "CRAZY TAXI.gdi").write_text("dummy", encoding="ascii")
+
+    resolved = resolve_game_display_name(folder, "OpenMenu Name", 2)
+
+    assert resolved.name == "Daytona USA"
+    assert resolved.source == "name_txt"
+    assert resolved.confidence == "high"
+
+
+def test_resolve_game_display_name_uses_menu_before_media_filename(tmp_path):
+    folder = tmp_path / "03"
+    folder.mkdir()
+    (folder / "CRAZY TAXI.gdi").write_text("dummy", encoding="ascii")
+
+    resolved = resolve_game_display_name(folder, "Crazy Taxi", 3)
+
+    assert resolved.name == "Crazy Taxi"
+    assert resolved.source == "openmenu"
+
+
+def test_resolve_game_display_name_uses_media_filename_when_menu_is_missing(tmp_path):
+    folder = tmp_path / "04"
+    folder.mkdir()
+    (folder / "MARVEL VS.CAPCOM.gdi").write_text("dummy", encoding="ascii")
+
+    resolved = resolve_game_display_name(folder, "", 4)
+
+    assert resolved.name == "MARVEL VS CAPCOM"
+    assert resolved.source == "media_filename"
+
+
+def test_read_descriptive_media_filename_ignores_generic_disc_and_tracks(tmp_path):
+    folder = tmp_path / "05"
+    folder.mkdir()
+    (folder / "disc.gdi").write_text("dummy", encoding="ascii")
+    (folder / "track03.iso").write_text("dummy", encoding="ascii")
+
+    assert read_descriptive_media_filename(folder) == ""
+
+
+def test_resolve_game_display_name_uses_internal_name_when_filename_is_generic(tmp_path):
+    folder = tmp_path / "15"
+    folder.mkdir()
+    (folder / "disc.gdi").write_text(
+        "\n".join(["1", "1 45000 4 2048 track03.bin 0"]),
+        encoding="ascii",
+    )
+    ip = bytearray(0x100)
+    ip[:16] = b"SEGA SEGAKATANA "
+    ip[0x80:0x100] = b"SONIC ADVENTURE".ljust(0x80, b" ")
+    (folder / "track03.bin").write_bytes(bytes(ip))
+
+    resolved = resolve_game_display_name(folder, "", 15)
+
+    assert resolved.name == "SONIC ADVENTURE"
+    assert resolved.source == "internal_name"
+    assert resolved.internal_name == "SONIC ADVENTURE"
 
 
 def test_read_disc_product_id_reads_ip_bin_from_declared_gdi_track(tmp_path):

@@ -3,7 +3,9 @@ from pathlib import Path
 import openmenu_gdemu_manager.dreamcast.storage_diagnostics as storage_diagnostics
 from openmenu_gdemu_manager.dreamcast.storage_diagnostics import (
     ROUTE_EMPTY_SAFE,
+    MENU_GDMENU_BASIC,
     MENU_OPENMENU_COMPATIBLE,
+    MENU_OPENMENU_OLD,
     diagnose_storage,
     recommended_initial_storage_path,
 )
@@ -110,6 +112,57 @@ def test_diagnose_storage_detects_rebuilt_openmenu_track05_bin(tmp_path):
     assert diagnostic.scan_allowed is True
     assert diagnostic.write_allowed is True
     assert diagnostic.menu_state == MENU_OPENMENU_COMPATIBLE
+
+
+def test_diagnose_storage_marks_old_openmenu_as_migratable(tmp_path):
+    slot1 = tmp_path / "01"
+    slot1.mkdir()
+    (slot1 / "track05.iso").write_bytes(b"prefix [OPENMENU] legacy data suffix")
+
+    diagnostic = diagnose_storage(tmp_path)
+
+    assert diagnostic.scan_allowed is True
+    assert diagnostic.write_allowed is False
+    assert diagnostic.menu_state == MENU_OPENMENU_OLD
+    assert diagnostic.legacy_menu_migratable is True
+
+
+def test_diagnose_storage_marks_basic_gdmenu_as_migratable(tmp_path):
+    slot1 = tmp_path / "01"
+    slot1.mkdir()
+    (slot1 / "disc.gdi").write_text("1\n1 0 4 2048 track03.iso 0\n", encoding="ascii")
+    (slot1 / "track03.iso").write_bytes(b"GDMenu")
+
+    diagnostic = diagnose_storage(tmp_path)
+
+    assert diagnostic.scan_allowed is True
+    assert diagnostic.write_allowed is False
+    assert diagnostic.menu_state == MENU_GDMENU_BASIC
+    assert diagnostic.legacy_menu_migratable is True
+
+
+def test_diagnose_storage_marks_unknown_slot_01_as_migratable(tmp_path):
+    (tmp_path / "01").mkdir()
+    (tmp_path / "02").mkdir()
+
+    diagnostic = diagnose_storage(tmp_path)
+
+    assert diagnostic.scan_allowed is True
+    assert diagnostic.write_allowed is False
+    assert diagnostic.legacy_menu_migratable is True
+
+
+def test_diagnose_storage_does_not_migrate_corrupt_or_missing_slot_01(tmp_path):
+    (tmp_path / "found.000").mkdir()
+    (tmp_path / "01").mkdir()
+
+    corrupt = diagnose_storage(tmp_path)
+    assert corrupt.legacy_menu_migratable is False
+
+    clean = tmp_path / "clean"
+    clean.mkdir()
+    clean_diagnostic = diagnose_storage(clean)
+    assert clean_diagnostic.legacy_menu_migratable is False
 
 
 def test_install_openmenu_base_copies_slot_01_and_rediagnoses(tmp_path):

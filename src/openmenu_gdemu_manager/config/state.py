@@ -4,6 +4,7 @@ from pathlib import Path
 from ..core.image_quality import NORMALIZATION_MODE, analyze_image_file, apply_quality_report
 from ..core.matching import normalize_product, score_candidate
 from ..core.models import GameItem, VALID_STATES
+from ..dreamcast.metadata import is_descriptive_game_name
 
 
 def load_state(path: Path) -> dict:
@@ -35,7 +36,7 @@ def apply_state(game: GameItem, state: dict, root: Path) -> None:
         return
     scanned_cover = game.current_cover is not None
     saved_name = (data.get("name") or "").strip()
-    if saved_name:
+    if saved_name and (is_descriptive_game_name(saved_name) or not is_descriptive_game_name(game.name)):
         game.name = saved_name
     if not game.product_id:
         game.product_id = data.get("product_id", "") or ""

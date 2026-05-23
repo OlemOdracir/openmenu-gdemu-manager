@@ -77,6 +77,7 @@ class StorageDiagnostic:
     write_allowed: bool
     scan_allowed: bool
     prepare_allowed: bool = False
+    legacy_menu_migratable: bool = False
     reason: str = ""
     warnings: list[str] = field(default_factory=list)
     summary: RouteSummary | None = None
@@ -153,10 +154,10 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
         if menu.state in {MENU_GDMENU_BASIC, MENU_OPENMENU_OLD}:
             return _diagnostic(root, route_class, health, menu.state, False, True,
                                "La estructura se puede leer, pero requiere migrar o actualizar OpenMenu antes de escribir.",
-                               warnings, summary, menu)
+                               warnings, summary, menu, legacy_menu_migratable=True)
         return _diagnostic(root, route_class, health, menu.state, False, True,
                            "La estructura tiene slots, pero el menu no es compatible para escritura.",
-                           warnings, summary, menu)
+                           warnings, summary, menu, legacy_menu_migratable=(menu.state == MENU_UNKNOWN))
 
     if summary.is_root or len(relevant_entries) > 20:
         return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, MENU_UNKNOWN, False, False,
@@ -211,7 +212,8 @@ def detect_menu(root: Path) -> MenuDiagnostic:
 
 def _diagnostic(root: Path, route_class: str, health: str, menu_state: str, write_allowed: bool,
                 scan_allowed: bool, reason: str, warnings: list[str], summary: RouteSummary,
-                menu: MenuDiagnostic | None = None, prepare_allowed: bool = False) -> StorageDiagnostic:
+                menu: MenuDiagnostic | None = None, prepare_allowed: bool = False,
+                legacy_menu_migratable: bool = False) -> StorageDiagnostic:
     return StorageDiagnostic(
         root=root,
         route_class=route_class,
@@ -220,6 +222,7 @@ def _diagnostic(root: Path, route_class: str, health: str, menu_state: str, writ
         write_allowed=write_allowed,
         scan_allowed=scan_allowed,
         prepare_allowed=prepare_allowed,
+        legacy_menu_migratable=legacy_menu_migratable,
         reason=reason,
         warnings=warnings,
         summary=summary,
