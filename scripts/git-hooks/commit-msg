@@ -1,0 +1,20 @@
+#!/bin/sh
+# Standard-library Python validator; path-independent and safe for spaces.
+repo_root=$(git rev-parse --show-toplevel) || exit 2
+validator="$repo_root/scripts/check_commit_message.py"
+usable_python() {
+    "$@" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1
+}
+if [ -x "$repo_root/.venv/Scripts/python.exe" ] && usable_python "$repo_root/.venv/Scripts/python.exe"; then
+    exec "$repo_root/.venv/Scripts/python.exe" "$validator" "$1"
+elif [ -x "$repo_root/.venv/bin/python" ] && usable_python "$repo_root/.venv/bin/python"; then
+    exec "$repo_root/.venv/bin/python" "$validator" "$1"
+elif command -v py >/dev/null 2>&1 && usable_python py -3; then
+    exec py -3 "$validator" "$1"
+elif command -v python3 >/dev/null 2>&1 && usable_python python3; then
+    exec python3 "$validator" "$1"
+elif command -v python >/dev/null 2>&1 && usable_python python; then
+    exec python "$validator" "$1"
+fi
+printf '%s\n' 'Commit validation needs a working Python 3.11+. Activate the project environment or install Python, then retry.' >&2
+exit 2

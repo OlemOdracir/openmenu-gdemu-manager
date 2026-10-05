@@ -2,6 +2,16 @@
 
 This file defines mandatory engineering rules for contributors and AI agents.
 
+## Git workflow
+
+Follow [Basic Gitflow and Conventional Commits](docs/GIT_WORKFLOW.md).
+
+1. Use `develop` for ongoing integration; keep `main` for stable validated versions.
+2. Use focused topic branches from `develop` for larger changes and target their PRs to `develop`. Promote validated versions through a PR from `develop` to `main`; synchronize hotfixes back into `develop`.
+3. Use Conventional Commit headers for new authored commits. Do not rewrite public history to rename old commits.
+4. Preserve unrelated staged/unstaged changes. Commit only the files or hunks belonging to the current task.
+5. A public branch or draft PR is public. Apply the content/licensing rules in CONTRIBUTING before publishing prototype assets.
+
 ## Safety rules for SD writes
 
 1. Never write to an SD path without passing storage diagnostics and `write_allowed`.

@@ -4,6 +4,9 @@ Thanks for helping improve OpenMenu GDEMU Manager.
 
 ## Rules
 
+- Follow [Basic Gitflow and Conventional Commits](docs/GIT_WORKFLOW.md): work in `develop`, use topic branches for larger changes, and promote validated releases to `main` through a pull request.
+- Use Conventional Commit headers for new authored commits and enable the versioned local commit-message hook (`git config --local core.hooksPath scripts/git-hooks`). Existing custom hooks should be integrated rather than overwritten.
+
 - Use pull requests.
 - Keep changes focused and easy to review.
 - Follow `AGENTS.md` rules for SD safety, rebuild flow, and release checks.
