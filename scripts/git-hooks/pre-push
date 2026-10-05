@@ -1,0 +1,19 @@
+#!/bin/sh
+repo_root=$(git rev-parse --show-toplevel) || exit 2
+validator="$repo_root/scripts/check_commit_push.py"
+usable_python() {
+    "$@" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1
+}
+if [ -x "$repo_root/.venv/Scripts/python.exe" ] && usable_python "$repo_root/.venv/Scripts/python.exe"; then
+    exec "$repo_root/.venv/Scripts/python.exe" "$validator" --repo "$repo_root"
+elif [ -x "$repo_root/.venv/bin/python" ] && usable_python "$repo_root/.venv/bin/python"; then
+    exec "$repo_root/.venv/bin/python" "$validator" --repo "$repo_root"
+elif command -v py >/dev/null 2>&1 && usable_python py -3; then
+    exec py -3 "$validator" --repo "$repo_root"
+elif command -v python3 >/dev/null 2>&1 && usable_python python3; then
+    exec python3 "$validator" --repo "$repo_root"
+elif command -v python >/dev/null 2>&1 && usable_python python; then
+    exec python "$validator" --repo "$repo_root"
+fi
+printf '%s\n' 'Push validation needs a working Python 3.11+.' >&2
+exit 2

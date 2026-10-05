@@ -8,7 +8,7 @@ Follow [Basic Gitflow and Conventional Commits](docs/GIT_WORKFLOW.md).
 
 1. Use `develop` for ongoing integration; keep `main` for stable validated versions.
 2. Use focused topic branches from `develop` for larger changes and target their PRs to `develop`. Promote validated versions through a PR from `develop` to `main`; synchronize hotfixes back into `develop`.
-3. Use Conventional Commit headers for new authored commits. Do not rewrite public history to rename old commits.
+3. Use Conventional Commit headers for every new commit, including merges, squashes, reverts, releases and bots, and for PR titles. No automatic-message exception. Enable the versioned commit-msg/pre-push hooks, run the policy checks and preserve their CI validation. Do not rewrite public history or move the grandfathered history anchor to hide violations. Report server enforcement limitations accurately; see docs/GIT_WORKFLOW.md.
 4. Preserve unrelated staged/unstaged changes. Commit only the files or hunks belonging to the current task.
 5. A public branch or draft PR is public. Apply the content/licensing rules in CONTRIBUTING before publishing prototype assets.
 

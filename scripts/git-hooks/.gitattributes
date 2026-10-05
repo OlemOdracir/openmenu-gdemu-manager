@@ -1,1 +1,2 @@
 commit-msg text eol=lf
+pre-push text eol=lf
