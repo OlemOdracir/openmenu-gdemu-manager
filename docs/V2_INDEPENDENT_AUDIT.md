@@ -42,9 +42,15 @@ After iterative corrections, the independent reviewer gave **approval for the
 current local development code**, with no remaining reproducible blockers from
 this audit. Its final independent full-suite run used native Windows at DPR 2.5:
 **276 passed, 2 skipped**, including the formerly failing 900×620 gallery and
-the interrupted rollback reproductions. This approval preceded the metadata-only
-version bump to `2.0.0.dev2`. The generated
-[validation evidence](V2_VALIDATION.md) records the current full harness results.
+the interrupted rollback reproductions. Following that approval, the version was
+bumped to `2.0.0.dev2`, the reversal message was placed inside both language
+catalogs' `strings`, and the geometry assertions were strengthened. Final closure
+also caught the root compatibility shim's obsolete version; both root and src
+packages now import one shared metadata module, with fresh-interpreter import
+and `python -m` startup regression tests.
+The reviewer independently ran those two new tests successfully and maintained
+its code approval after inspecting the shared metadata and expanded digest.
+The generated [validation evidence](V2_VALIDATION.md) records the current full harness results.
 The dev2 portable was rebuilt and smoke-tested successfully through native Qt;
 its evidence is separate in [portable validation](V2_PORTABLE_VALIDATION.md).
 

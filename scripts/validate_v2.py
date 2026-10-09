@@ -8,7 +8,7 @@ DOC=ROOT/'docs/V2_VALIDATION.md'
 
 
 def source_digest():
-    paths=list((ROOT/'src').rglob('*.py'))+list((ROOT/'src').rglob('*.json'))+list((ROOT/'src').rglob('*.svg'))+list((ROOT/'tests').glob('test_v2*.py'))+[Path(__file__)]
+    paths=list((ROOT/'src').rglob('*.py'))+list((ROOT/'src').rglob('*.json'))+list((ROOT/'src').rglob('*.svg'))+list((ROOT/'tests').glob('test_v2*.py'))+list((ROOT/'openmenu_gdemu_manager').glob('*.py'))+[ROOT/'pyproject.toml',Path(__file__)]
     digest=hashlib.sha256()
     for path in sorted(paths):
         digest.update(path.relative_to(ROOT).as_posix().encode());digest.update(path.read_bytes().replace(b'\r\n',b'\n'))

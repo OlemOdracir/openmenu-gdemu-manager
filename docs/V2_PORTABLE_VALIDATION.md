@@ -19,7 +19,7 @@ with code 0 through the native Windows Qt backend at system DPI and reported:
 
 Archive: `OpenMenuGDEMUManager-2.0.0-dev2-portable-windows.zip`
 
-SHA256: `F4CE14D88098689D2C29CCA958B0E54BCDA3315E24BF633117C2ABE6B4672ABC`
+SHA256: `A5E7E77922998FA13B2D56523F4EAB20C299AA0374A8CDBD7AAE2945745A1E5F`
 
 This package supersedes dev1 after the independent audit corrections. Dev1 is
 historical evidence, not the current recommended development checkpoint.
