@@ -70,3 +70,30 @@ def test_cover_api_search_returns_proxied_media_urls_without_credentials():
     assert response.status == 200
     assert content_type.startswith("image/")
     assert sample
+
+
+@pytest.mark.parametrize('provider_id', ['openmenu', 'libretro', 'community_api'])
+def test_production_provider_search_download_and_decode(provider_id, tmp_path, monkeypatch):
+    """Opt-in: real application provider/decoder with private isolated cache."""
+    import copy
+    from openmenu_gdemu_manager.config.settings import DEFAULT_SETTINGS
+    from openmenu_gdemu_manager.core.models import GameItem
+    from openmenu_gdemu_manager.covers.providers.registry import provider_definitions
+    from openmenu_gdemu_manager.covers.providers import base
+    from openmenu_gdemu_manager.covers import search
+    monkeypatch.setattr(base, 'CACHE_DIR', tmp_path / 'catalogues')
+    monkeypatch.setattr(search, 'MANAGER_CACHE_DIR', tmp_path / 'cache')
+    settings = copy.deepcopy(DEFAULT_SETTINGS)
+    game = GameItem(2, 'Crazy Taxi', product_id='MK51035', region='US')
+    provider = provider_definitions()[provider_id]
+    assert not provider.requires_credentials and provider.find is not None
+    candidates = provider.find(game, game.name, settings)
+    assert candidates, f'{provider_id} returned no candidates'
+    candidates.sort(key=lambda c: c.score, reverse=True)
+    candidate = candidates[0]
+    assert candidate.url.startswith('https://')
+    assert not any(key in candidate.url.lower() for key in ('devpassword=', 'sspassword=', 'api_key='))
+    image = search.load_candidate_image(candidate)
+    image.load()
+    assert image.width > 0 and image.height > 0
+    assert image.mode == 'RGB'

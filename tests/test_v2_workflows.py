@@ -20,6 +20,7 @@ from openmenu_gdemu_manager.i18n import load_internal_language,set_language
 def window(monkeypatch,tmp_path):
     app=QApplication.instance() or QApplication([])
     monkeypatch.setattr(legacy,'migrate_legacy_runtime_data',lambda:None)
+    monkeypatch.setattr(legacy,'recommended_initial_storage_path',lambda fallback:tmp_path)
     # Fresh portable defaults to the original icon-only preference. V2 must
     # still show the approved icon + label without inheriting its fixed widths.
     monkeypatch.setattr(legacy,'load_settings',lambda:{'ui':{'language':'es','show_button_labels':False}})
@@ -98,6 +99,7 @@ def test_diagnostic_dialog_handoff_waits_for_thread_cleanup(window, monkeypatch)
 def test_initial_unrelated_working_directory_opens_destination_choice(window,monkeypatch):
     from pathlib import Path
     window.root_path=Path.cwd()
+    window.path_edit.setText(str(window.root_path))
     calls=[]
     monkeypatch.setattr(window,'open_setup_wizard',lambda diagnostic=None:calls.append(diagnostic))
     window.start_scan()
@@ -378,3 +380,91 @@ def test_old_icon_only_setting_cannot_clip_v2_labels(window):
     for button in (window.add_game_button,window.save_changes_button,window.bulk_mode_button,window.bulk_button):
         assert not button.property('iconOnly')
         assert button.width()>=button.fontMetrics().horizontalAdvance(button.text())+button.iconSize().width()+12
+
+
+
+def test_destination_picker_clears_config_and_permissions_before_scan(window, monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog
+    from openmenu_gdemu_manager.dreamcast.storage_diagnostics import diagnose_storage
+    slot=window.root_path/'01';slot.mkdir()
+    (slot/'track05.iso').write_bytes(b'[OPENMENU] openMenu NEODC_1')
+    (window.root_path/'GDEMU.ini').write_text('open_time=149\n')
+    window.diagnostic=diagnose_storage(window.root_path)
+    window._refresh_controls()
+    assert window.configuration_note.isVisible()
+    destination=tmp_path/'another-sd';destination.mkdir()
+    monkeypatch.setattr(QFileDialog,'getExistingDirectory',lambda *args:str(destination))
+    captured=[]
+    monkeypatch.setattr(window,'start_scan',lambda:captured.append((window.root_path,window.write_allowed,window.diagnostic,list(window.games),window.configuration_note.isVisible())))
+    window.pick_root()
+    assert captured==[(destination,False,None,[],False)]
+    assert window.games_by_slot=={}
+
+
+def test_destination_picker_cancel_keeps_config_and_context(window, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    from openmenu_gdemu_manager.dreamcast.storage_diagnostics import diagnose_storage
+    slot=window.root_path/'01';slot.mkdir()
+    (slot/'track05.iso').write_bytes(b'[OPENMENU] openMenu NEODC_1')
+    window.diagnostic=diagnose_storage(window.root_path)
+    window._refresh_controls()
+    before=(window.root_path,window.diagnostic,list(window.games),window.write_allowed,window.configuration_note.text())
+    monkeypatch.setattr(QFileDialog,'getExistingDirectory',lambda *args:'')
+    window.pick_root()
+    assert before==(window.root_path,window.diagnostic,window.games,window.write_allowed,window.configuration_note.text())
+
+
+def test_explicit_startup_root_does_not_discover_physical_storage(window, monkeypatch, tmp_path):
+    monkeypatch.setattr(legacy,'recommended_initial_storage_path',lambda *a:pytest.fail('Physical storage probed'))
+    app=QApplication.instance() or QApplication([])
+    w=MainWindowV2(initial_root=tmp_path)
+    assert w.root_path==tmp_path
+    w.close();w.deleteLater();app.processEvents()
+
+
+
+@pytest.mark.parametrize('language',['es','en'])
+def test_collection_configuration_action_opens_real_readonly_details(window, monkeypatch, language):
+    from PySide6.QtWidgets import QDialog, QLabel, QPushButton
+    from openmenu_gdemu_manager.dreamcast.storage_diagnostics import diagnose_storage
+    set_language(language)
+    slot=window.root_path/'01';slot.mkdir()
+    (slot/'track05.iso').write_bytes(b'[OPENMENU] openMenu NEODC_1')
+    path=window.root_path/'GDEMU.ini';path.write_text('open_time=149\n')
+    window.diagnostic=diagnose_storage(window.root_path)
+    window._refresh_controls();window.toggle_bulk_mode()
+    assert window.configuration_details_button.isVisible()
+    calls=[]
+    def review(dialog):
+        dialog.show();QApplication.instance().processEvents()
+        assert 'GDEMU.ini' in ' '.join(w.text() for w in dialog.findChildren(QLabel))
+        assert '150' in ' '.join(w.text() for w in dialog.findChildren(QLabel))
+        for button in dialog.findChildren(QPushButton):
+            assert button.isEnabled() and button.isVisible() and button.text() in ('Close','Cerrar')
+        assert not window.bulk_mode
+        target=__import__('os').environ.get('OPENMENU_V2_CAPTURE_DIR')
+        if target:
+            dialog.grab().save(str(Path(target)/f'collection-config-{language}.png'))
+        calls.append(dialog.windowTitle());dialog.reject()
+        return QDialog.DialogCode.Rejected
+    monkeypatch.setattr(QDialog,'exec',review)
+    QTest.mouseClick(window.configuration_details_button,Qt.MouseButton.LeftButton)
+    assert len(calls)==1 and path.read_text()=='open_time=149\n'
+    assert window.write_allowed
+
+
+
+@pytest.mark.parametrize('language',['es','en'])
+def test_empty_installed_collection_does_not_say_menu_is_missing(window, language):
+    from openmenu_gdemu_manager.dreamcast.storage_diagnostics import diagnose_storage
+    set_language(language)
+    slot=window.root_path/'01';slot.mkdir()
+    (slot/'track05.iso').write_bytes(b'[OPENMENU] openMenu NEODC_1')
+    window.diagnostic=diagnose_storage(window.root_path)
+    window.games=[];window.games_by_slot={}
+    window._refresh_controls()
+    assert window.guidance.text()==catalog.tr('collection_empty')
+    assert window.add_game_button.isEnabled()
+    window.diagnostic=None;window.write_allowed=False
+    window._refresh_controls()
+    assert window.guidance.text()==catalog.tr('destination_unknown')

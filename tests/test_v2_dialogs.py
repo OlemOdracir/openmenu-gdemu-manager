@@ -266,3 +266,60 @@ def test_all_original_dialog_exports_have_explicit_v2_disposition():
     exported = {name for name, item in inspect.getmembers(dialogs, inspect.isclass) if issubclass(item, QDialog)}
     replaced = {'SetupWizardDialog', 'CandidateDialog', 'CoverPreviewDialog', 'AddGameDialog'}
     assert exported == (set(RETAINED_DIALOGS) - {'ProviderConfigDialog'}) | replaced
+
+
+@pytest.mark.parametrize('language', ['es', 'en'])
+@pytest.mark.parametrize('config_text,expected', [(None, 'missing'), ('open_time=149\n', 'invalid'), ('open_time=150\nread_limit=-1\n', 'valid'), ('future_key=1\n', 'review')])
+def test_setup_configuration_is_localized_reachable_and_preserved(app, tmp_path, language, config_text, expected):
+    set_language(language)
+    slot = tmp_path / '01'
+    slot.mkdir()
+    (slot / 'track05.iso').write_bytes(b'[OPENMENU] openMenu NEODC_1')
+    path = tmp_path / 'GDEMU.ini'
+    if config_text is not None:
+        path.write_text(config_text, encoding='utf-8')
+    diagnostic = diagnose_storage(tmp_path)
+    assert diagnostic.configuration.status == expected
+    dialog = _show(app, setup.SetupWizardV2(diagnostic), (720, 500))
+    assert dialog.configuration_note.isVisible() == (expected != 'valid')
+    assert dialog.use_button.isEnabled() and diagnostic.write_allowed
+    QTest.mouseClick(dialog.details_action, Qt.MouseButton.LeftButton)
+    app.processEvents()
+    assert 'GDEMU.ini' in dialog.details.text() and 'v2.gdemu_config.' not in dialog.details.text()
+    _visible_buttons_reachable(dialog)
+    _capture(dialog, f'setup-config-{expected}-{language}')
+    if config_text is not None:
+        assert path.read_text(encoding='utf-8') == config_text
+    _dispose(app, dialog)
+
+
+def test_configuration_values_are_escaped_and_unknown_state_is_cleared(app, tmp_path):
+    from openmenu_gdemu_manager.ui.v2 import configuration
+    from openmenu_gdemu_manager.dreamcast.gdemu_config import inspect_gdemu_config
+    path = tmp_path / 'GDEMU.ini'
+    path.write_text('open_time=<b>bad</b>\n')
+    rendered = configuration.details(inspect_gdemu_config(tmp_path))
+    assert '&lt;b&gt;bad&lt;/b&gt;' in rendered and '<b>bad</b>' not in rendered
+    dialog = _show(app, setup.SetupWizardV2(diagnose_storage(tmp_path)))
+    dialog._route_edited('')
+    assert not dialog.configuration_note.isVisible()
+    _dispose(app, dialog)
+
+
+
+def test_configuration_large_repeated_input_has_bounded_presentation(app, tmp_path):
+    from openmenu_gdemu_manager.ui.v2 import configuration
+    path=tmp_path/'GDEMU.ini'
+    text='open_time=0\n'*5400
+    path.write_bytes(text.encode('utf-8'))
+    diagnostic=diagnose_storage(tmp_path)
+    assert len(diagnostic.configuration.findings)>10000
+    html=configuration.details(diagnostic.configuration)
+    assert html.count('<br>') < 50 and len(html)<15000
+    dialog=_show(app, setup.SetupWizardV2(diagnostic),(720,500))
+    QTest.mouseClick(dialog.details_action,Qt.MouseButton.LeftButton)
+    app.processEvents()
+    _visible_buttons_reachable(dialog)
+    _capture(dialog,'setup-config-many-lines')
+    assert path.read_text()==text
+    _dispose(app,dialog)

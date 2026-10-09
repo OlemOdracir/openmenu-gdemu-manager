@@ -23,6 +23,7 @@ def window(monkeypatch, tmp_path):
         main_window, "set_ui_preference",
         lambda key, value, current: {**current, "ui": {**current["ui"], key: value}},
     )
+    monkeypatch.setattr(main_window, "recommended_initial_storage_path", lambda fallback: tmp_path)
     view = main_window.MainWindow()
     yield view
     view.close()

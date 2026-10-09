@@ -10,7 +10,7 @@ from ...dreamcast.storage_diagnostics import diagnose_storage
 from ...services.setup_service import install_openmenu_base, OpenMenuSetupError
 from ...i18n import tr as app_tr
 from ..dialogs.setup_wizard import SetupWizardDialog, _confirm_dialog, _setup_error_text, _diagnostic_tiles
-from . import design
+from . import design, configuration
 from .catalog import tr
 from .design import Button, box, label, repolish
 
@@ -53,6 +53,8 @@ class SetupWizardV2(SetupWizardDialog):
         status.addWidget(self.security_title)
         status.addWidget(self.security_message)
         root.addWidget(self.security_card)
+        self.configuration_note = label('', muted=True, wrap=True)
+        root.addWidget(self.configuration_note)
         self.warning = label('', tone='warning', wrap=True)
         root.addWidget(self.warning)
         self.summary = label('', wrap=True)
@@ -95,6 +97,7 @@ class SetupWizardV2(SetupWizardDialog):
         self.security_message.setText(tr('setup_choose_body'))
         self.warning.hide()
         self.summary.hide()
+        self.configuration_note.hide()
         self.details_action.hide()
         self.details_scroll.hide()
         self.details_action.setChecked(False)
@@ -130,7 +133,12 @@ class SetupWizardV2(SetupWizardDialog):
             super()._show_diagnostic(diagnostic)
         finally:
             self._rendering = False
-        self.details.setText(self._diagnostic_rows + '<br>' + self.details.text())
+        config = diagnostic.configuration
+        self.configuration_note.setText(configuration.summary(config))
+        self.configuration_note.setVisible(config is not None and config.status != 'valid')
+        self.configuration_note.setProperty('tone', 'warning' if config and config.status in ('invalid', 'unreadable', 'review') else '')
+        repolish(self.configuration_note)
+        self.details.setText(self._diagnostic_rows + '<br>' + self.details.text() + '<br><br>' + configuration.details(config))
         # status cards use semantic properties, never legacy object-name variants.
         self.security_card.setObjectName('Card')
         self.security_message.setText(self.security_message.text().strip().replace('\n\n', '\n'))

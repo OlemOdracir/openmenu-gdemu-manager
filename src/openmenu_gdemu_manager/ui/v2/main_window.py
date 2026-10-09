@@ -14,7 +14,7 @@ from ..widgets import GamesTableModel,ThemeBackgroundWidget,BusyOverlay
 from ..workers import BulkWorker,SaveChangesWorker
 from ..dialogs import ConfirmApplyDialog
 from ..theme import template_palette
-from . import design,catalog
+from . import design,catalog,configuration
 from .catalog import tr
 from .design import Button,DestinationButton,label,repolish
 from .collection import CollectionModel,CollectionDelegate,CollectionHeader
@@ -23,7 +23,7 @@ from .bridge import CoverHost,ProductionWorkspace
 
 class MainWindowV2(MainWindow):
     uses_v2_design = True
-    def __init__(self):
+    def __init__(self, initial_root=None):
         self._v2_ready=False
         self.cover_host=None
         self.cover_jobs=[]
@@ -32,7 +32,7 @@ class MainWindowV2(MainWindow):
         self._before_edits={}
         self._initial_destination_checked=False
         self._pending_diagnostic=None
-        super().__init__()
+        super().__init__(initial_root=initial_root)
         self.setWindowTitle(APP_NAME+' · v2')
 
     def _build_ui(self):
@@ -52,6 +52,11 @@ class MainWindowV2(MainWindow):
         for button in (self.scan_button,self.add_game_button,self.save_changes_button):
             button.setParent(root);button.setStyleSheet('');button.setFixedHeight(42);toolbar.addWidget(button)
         layout.addLayout(toolbar)
+        config_row=QHBoxLayout()
+        self.configuration_note=label('',muted=True,wrap=True);config_row.addWidget(self.configuration_note,1)
+        self.configuration_details_button=Button('info',self.show_configuration_details,text=legacy_tr('v2.gdemu_config.details_action'),compact=True)
+        config_row.addWidget(self.configuration_details_button)
+        layout.addLayout(config_row)
         # Keep the controller's path and browse handles, without duplicate chrome.
         for widget in (self.path_edit,self.browse_button):widget.setParent(root);widget.hide()
         self.guidance=label('',wrap=True);self.guidance.setObjectName('Guidance');layout.addWidget(self.guidance)
@@ -151,7 +156,16 @@ class MainWindowV2(MainWindow):
         summary=self.diagnostic.summary if self.diagnostic else None
         subtitle=tr('destination_ready',filesystem=summary.filesystem or tr('local_folder'),free=f'{summary.free_bytes/1024**3:.1f}') if self.write_allowed and summary else tr('destination_readonly',reason=self.read_only_reason) if self.diagnostic and not self.write_allowed else tr('destination_unknown')
         self.destination.set_destination(str(self.root_path),subtitle)
-        self.guidance.setText(tr('destination_readonly',reason=self.read_only_reason) if self.diagnostic and not self.write_allowed else tr('missing_guidance',count=missing) if missing else tr('all_covered') if self.games else tr('destination_empty'))
+        config=self.diagnostic.configuration if self.diagnostic else None
+        self.configuration_note.setText(configuration.summary(config))
+        self.configuration_note.setVisible(config is not None)
+        self.configuration_details_button.setVisible(config is not None)
+        self.configuration_details_button.setEnabled(config is not None and not self.operation_running())
+        self.configuration_details_button.setText(legacy_tr('v2.gdemu_config.details_action'))
+        self.configuration_note.setToolTip(legacy_tr('v2.gdemu_config.open_details'))
+        self.configuration_note.setProperty('tone','warning' if config and config.status in ('invalid','unreadable','review') else '')
+        repolish(self.configuration_note)
+        self.guidance.setText(tr('destination_readonly',reason=self.read_only_reason) if self.diagnostic and not self.write_allowed else tr('missing_guidance',count=missing) if missing else tr('all_covered') if self.games else tr('collection_empty') if self.diagnostic and self.write_allowed else tr('destination_unknown'))
         self.summary.setText(tr('collection_count',count=len(self.games),missing=missing))
         for button in (self.add_game_button,self.save_changes_button,self.bulk_mode_button):repolish(button)
         for button in (self.add_game_button,self.save_changes_button):
@@ -398,12 +412,33 @@ class MainWindowV2(MainWindow):
         if discard:self.discard_pending_changes()
         return discard
 
+    def show_configuration_details(self):
+        self.leave_bulk()
+        if self.operation_running() or self.diagnostic is None or self.diagnostic.configuration is None:return
+        from ...dreamcast.gdemu_config import inspect_gdemu_config
+        self.diagnostic.configuration=inspect_gdemu_config(self.root_path)
+        self._refresh_controls()
+        configuration.show_dialog(self,self.diagnostic.configuration)
+
+    def _invalidate_destination(self, path):
+        self.root_path=Path(path)
+        self.games=[]
+        self.games_by_slot={}
+        self.bulk_proposals.clear()
+        self.cover_host.store.clear()
+        self.write_allowed=False
+        self.diagnostic=None
+        self._pending_diagnostic=None
+        self.read_only_reason=tr('destination_unknown')
+        self.apply_filters()
+
     def pick_root(self):
         self.leave_bulk()
         if not self._can_abandon():return
         before=self.path_edit.text();super().pick_root()
         if before!=self.path_edit.text():
-            self.games=[];self.bulk_proposals.clear();self.cover_host.store.clear();self.start_scan()
+            self._invalidate_destination(self.path_edit.text())
+            self.start_scan()
 
     def start_scan(self):
         self.leave_bulk()
@@ -411,6 +446,9 @@ class MainWindowV2(MainWindow):
             self._rescan_after_worker=True
             return
         if not self._can_abandon():return
+        requested=Path(self.path_edit.text())
+        if requested.resolve()!=self.root_path.resolve():
+            self._invalidate_destination(requested)
         if not self._initial_destination_checked:
             self._initial_destination_checked=True
             if self.root_path.resolve()==Path.cwd().resolve():
@@ -433,14 +471,7 @@ class MainWindowV2(MainWindow):
         if dialog.selected_path:
             changed=Path(dialog.selected_path).resolve()!=self.root_path.resolve()
             if changed:
-                self.games=[]
-                self.games_by_slot={}
-                self.bulk_proposals.clear()
-                self.cover_host.store.clear()
-                self.write_allowed=False
-                self.diagnostic=None
-                self.read_only_reason=tr('destination_unknown')
-                self.apply_filters()
+                self._invalidate_destination(dialog.selected_path)
             self.path_edit.setText(str(dialog.selected_path))
             self.root_path=dialog.selected_path
             self.start_scan()

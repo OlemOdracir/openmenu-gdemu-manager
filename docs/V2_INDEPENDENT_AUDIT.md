@@ -58,15 +58,17 @@ Final artifact closure: the reviewer explicitly approved **delivery of dev2 for
 local development**, confirming the final 278 passed / 2 skipped evidence and
 27 UI-flow passes per scale/backend. It checked the final ZIP's SHA256, CRC
 integrity, executable identity against dist, startup report and documentation
-digest. No reproducible blocker remained. This is the final reviewed artifact
-identified in the portable validation document, not the earlier dev1 package.
+digest. No reproducible blocker remained. This records the historical dev2
+artifact approval; the portable validation document identifies the current
+development package.
 
 ## Checks requiring other evidence
 
-- Clean Windows environment and real enabled-provider searches.
+- Clean Windows environment and private/credentialed provider searches. Public
+  provider checks were completed in the dev4 follow-up below.
 - CDI internal descriptor/track-bound validation and unusual GDI layouts.
-- Runtime presence/semantic diagnosis of GDEMU.ini: preservation is implemented,
-  but the configuration audit required by the launch protocol remains pending.
+- Firmware interpretation and game launch on real hardware. Read-only root
+  GDEMU.ini diagnosis was completed in the dev4 follow-up below.
 - Backed-up disposable SD and actual Dreamcast/GDEMU game launch checks, following
   [the launch protocol](VALIDATION_GAME_LAUNCH.md).
 
@@ -102,3 +104,41 @@ and source startup passed, ZIP CRC passed and the executable identity and
 archive SHA256 were checked. See the updated portable validation document.
 These local checks do not extend the independent approval to hardware or a
 clean Windows VM. Uncommitted changes were preserved during the migration.
+
+## Configuration and collection follow-up — 2026-10-09
+
+Dev4 adds bounded, read-only root GDEMU.ini diagnosis, separate from image
+integrity and storage permissions. An independent agent received repository paths
+and the documented contract without conversation history. It withheld approval
+for stale destination context, excessive RichText rendering, inaccessible
+configuration details and an untranslated close button. These were corrected and
+reproduced using native Qt at system DPR 2.5. Large-input presentation now bounds
+rows and reports omitted counts; the underlying file is preserved completely.
+
+The reviewer checked five configuration states in both languages, 14 hostile or
+boundary cases, actual collection-button access and closure, and window geometry.
+It explicitly approved the corrected local configuration/UI scope after repeating
+15 affected tests. A subsequent visual review found incorrect guidance for an
+installed but empty collection. The reviewer rendered empty/unknown/read-only/
+missing-cover states in EN/ES, checked top-aligned configuration details, passed
+8 focused tests and maintained approval. No additional reproducible blocker
+remained in this scope.
+
+The initial configuration/UI review did not certify packaging, clean Windows,
+physical SD, Dreamcast, or private providers. The complete final regression results are in
+[V2_VALIDATION.md](V2_VALIDATION.md), local package startup evidence in
+[V2_PORTABLE_VALIDATION.md](V2_PORTABLE_VALIDATION.md), and the separately executed
+public-provider search/download/decoding checks in
+[V2_PROVIDER_VALIDATION.md](V2_PROVIDER_VALIDATION.md). Symlink creation is skipped
+on this Windows account; containment is reviewed and the test runs on hosts that
+permit link creation. Hardware validation is deferred at the user's request;
+local tests use isolated destinations and do not discover physical storage.
+
+Final dev4 delivery closure: the independent reviewer explicitly approved
+**dev4 for local development**, including packaging and local evidence. It
+verified the ZIP/sidecar SHA256, CRC of all 474 entries, archived/built executable
+identity, equal source/portable startup reports and current documentation digest.
+The final harness recorded **355 passed / 6 skipped**, with **74 UI-flow passes**
+for each offscreen 1.25, offscreen 1.5 and native Windows system-DPR run. No
+reproducible blocker remained within this scope. This approval does not certify
+clean Windows, physical SD/Dreamcast, deep CDI validation or private providers.

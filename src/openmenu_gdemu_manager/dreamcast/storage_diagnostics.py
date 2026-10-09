@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .metadata import find_openmenu_track
+from .gdemu_config import GdemuConfiguration, inspect_gdemu_config
 
 
 ROUTE_EMPTY_SAFE = "empty_safe"
@@ -82,6 +83,7 @@ class StorageDiagnostic:
     warnings: list[str] = field(default_factory=list)
     summary: RouteSummary | None = None
     menu: MenuDiagnostic | None = None
+    configuration: GdemuConfiguration | None = None
 
     @property
     def is_blocked(self) -> bool:
@@ -227,6 +229,7 @@ def _diagnostic(root: Path, route_class: str, health: str, menu_state: str, writ
         warnings=warnings,
         summary=summary,
         menu=menu or MenuDiagnostic(menu_state, reason),
+        configuration=inspect_gdemu_config(root) if scan_allowed or prepare_allowed else None,
     )
 
 

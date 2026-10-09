@@ -1,6 +1,6 @@
 # OpenMenu GDEMU Manager v2
 
-Version `2.0.0.dev3`, development branch `feature/openmenu-v2` based on `develop`.
+Version `2.0.0.dev4`, development branch `feature/openmenu-v2` based on `develop`.
 This is a real PySide6 application over the original services. It is not the
 HTML mockup or a simulation, and is not yet a hardware-validated public release.
 
@@ -85,7 +85,13 @@ track count/order, quoted filenames, path containment, offsets, missing/empty
 tracks, incomplete sectors and provable ISO9660 volume truncation before an
 addition can mutate the SD. It validates the staged destination again before
 publishing a slot. A failed copy remains recoverable through original transaction
-metadata. Existing GDEMU.ini is preserved, with no guessed configuration changes.
+metadata. Existing GDEMU.ini is preserved. The runtime diagnosis separately reports its
+optional absence, unreadable content, unsupported sections/keys, duplicate known
+keys and invalid documented values. Root settings and line numbers appear in
+expandable technical details with allowed ranges. No timings or other values
+are inferred, repaired or written, and configuration findings do not certify
+image integrity or change storage permissions. The view bounds the number of
+rendered rows and reports omitted counts; the original file remains complete.
 Recovery revalidates source and staging, records ownership of published additions
 and retains it after late failures. Pending transactions block new writes from
 both the worker and service until completed/reverted. Reversal evacuates owned
@@ -105,7 +111,7 @@ python -m openmenu_gdemu_manager
 python -m openmenu_gdemu_manager --legacy-ui
 python scripts/validate_v2.py
 python scripts/validate_v2.py --check-docs
-./scripts/build_portable.ps1 -Version "2.0.0-dev3"
+./scripts/build_portable.ps1 -Version "2.0.0-dev4"
 ./dist/OpenMenuGDEMUManager-Portable/OpenMenuGDEMUManager.exe --self-test report.json
 ```
 
@@ -125,11 +131,10 @@ the repository's existing commit-msg/pre-push hooks.
 ## Remaining release checks
 
 - Portable launch in a clean Windows VM, beyond this development PC.
-- Real searches against enabled providers; automated network tests are skipped.
+- Private/credentialed provider checks as configured by the user. Public OpenMenu,
+  Libretro and Cover API search/download/decoding passed the opt-in tests; see
+  [provider evidence](V2_PROVIDER_VALIDATION.md). Offline suites still skip network calls.
 - CDI internal descriptor/track validation and unusual GDI layouts.
-- Runtime inspection/reporting of missing or invalid GDEMU.ini. Preservation is
-  implemented; semantic configuration diagnosis from the launch protocol remains
-  pending and must not be inferred from the structural image checks.
 - A disposable backed-up SD and Dreamcast/GDEMU test: setup, add GDI/CDI, rename,
   change covers, remove/compact, then actually launch each game.
 

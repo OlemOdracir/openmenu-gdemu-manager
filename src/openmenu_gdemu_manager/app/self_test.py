@@ -13,7 +13,7 @@ def run(report_path):
     failures=[]
     def failed(*args):failures.append(str(args[-1]))
     QMessageBox.critical=failed
-    window=MainWindowV2()
+    window=MainWindowV2(initial_root=Path(report_path).resolve().parent)
     window.show();app.processEvents()
     assets=all(not icon(spec['icon']).isNull() for spec in ACTIONS.values())
     report={'version':__version__,'startup':window._v2_ready,'icons':assets,'errors':failures,'sd_scanned':False,'network_requested':False}

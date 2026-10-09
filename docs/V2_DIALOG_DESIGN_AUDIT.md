@@ -1,6 +1,6 @@
 # V2 dialog design coverage
 
-Development checkpoint: `2.0.0.dev3`. This review closes the missed visual
+Development checkpoint: `2.0.0.dev4`. This review closes the missed visual
 integration of the original SD wizard. The dev2 audit remains historical
 functional/transaction evidence; its approval did not certify all screens.
 
@@ -25,6 +25,8 @@ functional/transaction evidence; its approval did not certify all screens.
 | No destination chosen | Compact V2 setup, empty route, Select SD as primary; no startup alarm about the executable directory. |
 | Empty compatible destination | Install OpenMenu as primary; confirmation remains required; outcome remains visible until Continue. |
 | Ready / read-only / blocked destination | Original diagnostic remains authoritative; use/install hidden when unavailable; choose another destination is primary for a blocked path. |
+| Collection configuration details | A visible info+label action opens an actual read-only dialog, including for valid configuration. Current configuration is re-read without changing other storage findings; bulk mode exits. Scroll and a translated Close footer use shared V2 atoms. |
+| Configuration inspection | Optional missing file is neutral, independent from game integrity and write permission; nonconfirmed/invalid content directs users to technical details. Settings, line numbers and documented bounds are localized and escaped. Long inputs have a bounded view with omitted counts. |
 | Edited destination | Prior approval invalidated; current path diagnosed again before installation/acceptance. |
 | Diagnostic details | Expandable scroll area with all diagnostic categories and original path/classification/menu/permission values; local filesystem N/A is plain neutral text. |
 | Backup in setup | Original worker/service/registry; route changes and closure blocked through thread cleanup. |
@@ -72,3 +74,19 @@ It does not certify every external template, pathological screen/window size,
 OS-owned file picker appearance, provider network availability or hardware.
 Clean Windows, physical SD and Dreamcast gates remain in OPENMENU_V2.md.
 Final independent status is recorded in V2_INDEPENDENT_AUDIT.md after closure.
+
+
+## Configuration follow-up
+
+Read-only GDEMU.ini diagnosis is also exposed in the collection without replacing
+cover guidance or introducing a configuration editor. A visible action opens a
+dedicated read-only dialog, even for a file with valid supported settings. Changing destination through
+the folder picker or setup invalidates the prior diagnosis, games, drafts and
+write permission before scanning. Cancelling the picker preserves that context.
+Self-tests supply an explicit local destination, so startup evidence cannot
+silently discover physical cards. The full-suite source digest now includes every
+regression test, including configuration and optional provider tests.
+
+Independent review caught stale destination context and excessive RichText rows
+from a bounded but repetitive file. Both gained reproductions and corrections;
+final reviewer disposition is recorded in V2_INDEPENDENT_AUDIT.md.

@@ -167,7 +167,7 @@ class BulkSelectionHeader(QHeaderView):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, initial_root: Path | None = None):
         super().__init__()
         migrate_legacy_runtime_data()
         self.settings = load_settings()
@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(app_qicon())
         self.resize(1280, 780)
         self.state = load_state(STATE_PATH)
-        self.root_path = recommended_initial_storage_path(Path.cwd())
+        self.root_path = Path(initial_root) if initial_root is not None else recommended_initial_storage_path(Path.cwd())
         self.games: list[GameItem] = []
         self.filtered_games: list[GameItem] = []
         self.scan_thread: QThread | None = None
