@@ -298,4 +298,3 @@ def box(vertical=True, margins=0, spacing=8, name=None):
     layout.setContentsMargins(margins, margins, margins, margins)
     layout.setSpacing(spacing)
     return widget, layout
-

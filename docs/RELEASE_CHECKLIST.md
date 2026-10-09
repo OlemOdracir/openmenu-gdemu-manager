@@ -2,9 +2,15 @@
 
 ## Before building
 
+For V2, run `python scripts/validate_v2.py` and
+`python scripts/validate_v2.py --check-docs`. Review `docs/OPENMENU_V2.md`,
+`docs/V2_VALIDATION.md` and `docs/V2_PORTABLE_VALIDATION.md`. V1 hardware reports
+do not satisfy the V2 clean-Windows, provider, CDI-integrity or physical launch gates.
+
 - Confirm the repository is clean: `git status --short`.
 - Confirm no credentials, ROMs, BIOS files, SD backups, logs or cache files are staged.
 - Run unit tests: `py -m pytest`.
+- For import/storage/copy/setup/slot/menu changes, satisfy `docs/VALIDATION_GAME_LAUNCH.md`, including incomplete-source rejection before SD mutations, destination-image validation, and `GDEMU.ini` preservation/reporting.
 - Confirm the app version and build version match the intended tag.
 - Confirm `THIRD_PARTY_NOTICES.md` still covers bundled tools and assets.
 - Run public API integration tests when the API changed:
@@ -54,7 +60,9 @@ The script validates:
 - Boot OpenMenu on Dreamcast/GDEMU after a rebuild.
 - Confirm the game list appears with expected titles.
 - Confirm covers appear for changed games.
-- Launch at least one existing game and one newly added game.
+- Launch at least one structurally verified complete existing game and one newly added verified complete game; confirm a playable screen, not only that OpenMenu boots.
+- Record relevant `GDEMU.ini` settings and image identity/hash alongside the console result.
+- Mark hardware launch validation pending if no console test was performed; never infer it from passing PC tests.
 - For large operations, rescan the SD on PC after the console test and confirm no coherence warning remains.
 
 ## GitHub release

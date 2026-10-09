@@ -66,4 +66,3 @@ def test_spanish_catalog_has_all_keys_and_matching_format_fields():
     for key, value in en.items():
         fields = lambda text: sorted(field for _, field, _, _ in formatter.parse(text) if field is not None)
         assert fields(value) == fields(es[key]), key
-
