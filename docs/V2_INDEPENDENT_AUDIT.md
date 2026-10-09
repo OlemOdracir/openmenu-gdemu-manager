@@ -54,6 +54,13 @@ The generated [validation evidence](V2_VALIDATION.md) records the current full h
 The dev2 portable was rebuilt and smoke-tested successfully through native Qt;
 its evidence is separate in [portable validation](V2_PORTABLE_VALIDATION.md).
 
+Final artifact closure: the reviewer explicitly approved **delivery of dev2 for
+local development**, confirming the final 278 passed / 2 skipped evidence and
+27 UI-flow passes per scale/backend. It checked the final ZIP's SHA256, CRC
+integrity, executable identity against dist, startup report and documentation
+digest. No reproducible blocker remained. This is the final reviewed artifact
+identified in the portable validation document, not the earlier dev1 package.
+
 ## Checks requiring other evidence
 
 - Clean Windows environment and real enabled-provider searches.
