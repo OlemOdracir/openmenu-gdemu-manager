@@ -75,8 +75,9 @@ class SlotTransactionResult:
 
 
 class SdSlotTransactionService:
-    def __init__(self, root_path: Path, operation_id: str):
+    def __init__(self, root_path: Path, operation_id: str, source_validator=None):
         self.root_path = Path(root_path)
+        self.source_validator = source_validator
         self.operation_id = operation_id
         self.transaction_dir = registry_dir(self.root_path) / "slot_transactions" / operation_id
         self.temp_dir = self.transaction_dir / "temp"
@@ -133,6 +134,9 @@ class SdSlotTransactionService:
         progress: ProgressCallback | None = None,
     ) -> SlotTransactionResult:
         self._validate_plan_paths(plan)
+        if self.source_validator:
+            for entry in plan.additions:
+                self.source_validator(Path(entry.source_path))
         self.transaction_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.add_dir.mkdir(parents=True, exist_ok=True)
@@ -184,6 +188,7 @@ class SdSlotTransactionService:
                     shutil.rmtree(temp)
                 copy_game_source(source_path, temp)
                 self._verify_copied_source(source_path, temp)
+                if self.source_validator:self.source_validator(temp)
             self._write_state("added_to_temp", deleted=deleted, temp_slots=sorted(temp_by_old_slot))
 
             created_slots: list[int] = []
