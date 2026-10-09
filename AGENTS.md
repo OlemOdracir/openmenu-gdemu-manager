@@ -10,6 +10,13 @@ changes. Keep the original services/transactions and `--legacy-ui` fallback.
 Do not replace real services with prototype fixtures. Public release still
 requires the hardware/clean-Windows gates documented for V2.
 
+For UI changes, inventory every reachable screen and state, including inherited
+dialogs, startup language, QMessageBox/QInputDialog, progress and recovery.
+Maintain the explicit retained/replaced disposition in `tests/test_v2_dialogs.py`
+and `docs/V2_DIALOG_DESIGN_AUDIT.md`. Functional PASS is not visual approval.
+Review generated screenshots as well as behavior/geometry tests, and state the
+remaining manual/hardware gates. Do not count a callable method as screen coverage.
+
 This file defines mandatory engineering rules for contributors and AI agents.
 
 ## Git workflow

@@ -91,6 +91,6 @@ Release requirements remain in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) and 
 
 ## UX prototype checkpoint
 
-The current HTML prototype is maintained outside this checkout. Its local backup preserves the work. Adding it to this repository is a separate reviewed change under `docs/ux/prototype/`, with publication-ready assets, relative documentation links and the i18n requirements in AGENTS. Do not commit the cached cover images, generated HTML containing them, local backups, personal paths or run traces. Creating `develop` does not automatically import or publish that prototype.
+The current HTML prototype is maintained as ignored local artifacts alongside development. Its local backup preserves the work. Adding it to this repository is a separate reviewed change under `docs/ux/prototype/`, with publication-ready assets, relative documentation links and the i18n requirements in AGENTS. Do not commit the cached cover images, generated HTML containing them, local backups, personal paths or run traces. Creating `develop` does not automatically import or publish that prototype.
 
 References: [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/), [GitHub pull request workflow](https://docs.github.com/en/pull-requests/get-started/pull-request-quickstart).

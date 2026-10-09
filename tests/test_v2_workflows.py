@@ -48,6 +48,62 @@ def test_bulk_defaults_missing_and_global_all_ignores_filter(window):
     assert not any(window.bulk_checked.values())
 
 
+def test_setup_declined_pending_changes_preserves_destination_and_games(window, monkeypatch):
+    from openmenu_gdemu_manager.ui.v2 import setup
+    before=(window.root_path,window.path_edit.text(),list(window.games),window.write_allowed)
+    monkeypatch.setattr(window,'_can_abandon',lambda:False)
+    def forbidden(*args):raise AssertionError('Setup opened before abandonment approval')
+    monkeypatch.setattr(setup,'SetupWizardV2',forbidden)
+    window.open_setup_wizard()
+    assert (window.root_path,window.path_edit.text(),window.games,window.write_allowed)==before
+
+
+def test_setup_active_operation_cannot_open_installer(window, monkeypatch):
+    from openmenu_gdemu_manager.ui.v2 import setup
+    monkeypatch.setattr(window,'operation_running',lambda:True)
+    def forbidden(*args):raise AssertionError('Setup opened during active job')
+    monkeypatch.setattr(setup,'SetupWizardV2',forbidden)
+    window.open_setup_wizard()
+    monkeypatch.setattr(window,'operation_running',lambda:False)
+
+
+def test_setup_new_destination_revokes_old_permissions_before_rescan(window, monkeypatch, tmp_path):
+    from openmenu_gdemu_manager.ui.v2 import setup
+    from PySide6.QtWidgets import QDialog
+    destination=tmp_path/'new-destination';destination.mkdir()
+    class Accepted:
+        def __init__(self,*args):self.selected_path=destination
+        def exec(self):return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(setup,'SetupWizardV2',Accepted)
+    monkeypatch.setattr(window,'_can_abandon',lambda:True)
+    captured=[]
+    monkeypatch.setattr(window,'start_scan',lambda:captured.append((window.root_path,list(window.games),window.write_allowed)))
+    window.open_setup_wizard()
+    assert captured==[(destination,[],False)] and window.games_by_slot=={}
+
+
+def test_diagnostic_dialog_handoff_waits_for_thread_cleanup(window, monkeypatch):
+    from openmenu_gdemu_manager.dreamcast.storage_diagnostics import diagnose_storage
+    diagnostic=diagnose_storage(window.root_path)
+    running=[True];called=[]
+    monkeypatch.setattr(window,'operation_running',lambda:running[0])
+    monkeypatch.setattr(legacy.MainWindow,'finish_diagnostic',lambda self,d:called.append(d))
+    window.finish_diagnostic(diagnostic)
+    assert not called and window._pending_diagnostic is diagnostic
+    running[0]=False
+    window.refresh_after_worker()
+    assert called==[diagnostic] and window._pending_diagnostic is None
+
+
+def test_initial_unrelated_working_directory_opens_destination_choice(window,monkeypatch):
+    from pathlib import Path
+    window.root_path=Path.cwd()
+    calls=[]
+    monkeypatch.setattr(window,'open_setup_wizard',lambda diagnostic=None:calls.append(diagnostic))
+    window.start_scan()
+    assert calls==[None]
+
+
 def test_row_and_checkbox_toggle_once_and_actions_leave_bulk(window,monkeypatch):
     window.toggle_bulk_mode()
     row=0;index=window.games_model.index(row,GamesTableModel.C_NAME)

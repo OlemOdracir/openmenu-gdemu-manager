@@ -71,3 +71,34 @@ identified in the portable validation document, not the earlier dev1 package.
   [the launch protocol](VALIDATION_GAME_LAUNCH.md).
 
 Local development approval cannot certify these checks.
+
+## Dialog design follow-up — 2026-10-09
+
+Dev2 retained the original SD wizard without visual integration. Its functional
+approval was communicated too broadly; a callable-method check did not establish
+screen coverage. Dev3 adds an explicit retained/replaced inventory and generated
+rendering/geometry checks. Scope and corrections are in
+[dialog design coverage](V2_DIALOG_DESIGN_AUDIT.md).
+
+A new independent agent received the repository and documented design contract,
+without conversation history. It inspected and rendered all retained dialogs,
+including first-run language and standard Qt prompts. Approval was withheld for
+active-backup closure, untranslated standard buttons, clipped provider controls,
+missing metric icons and unsafe setup destination handoff. Corrections were
+reproduced through native Windows at system DPR 2.5, including actual diagnostic
+and backup workers using generated files, backup failure/retry, pending-work
+cancellation and original-UI fallback in a fresh process.
+
+Final explicit independent approval: **current corrected local V2 code and
+dialog design scope**, with **63 native tests passed** (workflows, retained
+dialogs and provider field localization). No reproducible blocker remained in
+that scope. This supplements the dev2 transaction audit; it does not replace
+the still-pending clean-Windows, network, physical-SD or Dreamcast gates.
+
+At the earlier checkpoint, the automatic approval reviewer could not run the
+packaging verification because the workspace was out of credits. After the
+local worktree migration on 2026-10-09, execution resumed: dev3 native packaged
+and source startup passed, ZIP CRC passed and the executable identity and
+archive SHA256 were checked. See the updated portable validation document.
+These local checks do not extend the independent approval to hardware or a
+clean Windows VM. Uncommitted changes were preserved during the migration.

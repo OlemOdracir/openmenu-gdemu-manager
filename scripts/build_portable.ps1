@@ -26,6 +26,13 @@ $Icon = Join-Path $Root "src\openmenu_gdemu_manager\resources\app\app_icon.ico"
 $Launcher = Join-Path $Root "scripts\portable_launcher.py"
 
 if (Test-Path -LiteralPath $PortableRoot) {
+  $ResolvedDistRoot = [IO.Path]::GetFullPath($DistRoot)
+  $ResolvedPortableRoot = (Resolve-Path -LiteralPath $PortableRoot).Path
+  $ExpectedPortableRoot = [IO.Path]::GetFullPath((Join-Path $ResolvedDistRoot "$Name-Portable"))
+  if ($ResolvedPortableRoot -ne $ExpectedPortableRoot -or
+      -not $ResolvedPortableRoot.StartsWith($ResolvedDistRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Portable cleanup target is outside the expected dist directory."
+  }
   Remove-Item -LiteralPath $PortableRoot -Recurse -Force
 }
 

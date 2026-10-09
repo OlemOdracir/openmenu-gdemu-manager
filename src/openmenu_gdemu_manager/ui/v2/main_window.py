@@ -1,5 +1,6 @@
 """V2 composition retaining the original service/transaction controller."""
 from pathlib import Path
+from ...config.settings import load_settings
 import copy
 import shiboken6
 from PySide6.QtCore import Qt,QSize,QTimer
@@ -21,6 +22,7 @@ from .bridge import CoverHost,ProductionWorkspace
 
 
 class MainWindowV2(MainWindow):
+    uses_v2_design = True
     def __init__(self):
         self._v2_ready=False
         self.cover_host=None
@@ -28,6 +30,8 @@ class MainWindowV2(MainWindow):
         self.missing_only=False
         self._rescan_after_worker=False
         self._before_edits={}
+        self._initial_destination_checked=False
+        self._pending_diagnostic=None
         super().__init__()
         self.setWindowTitle(APP_NAME+' · v2')
 
@@ -340,6 +344,11 @@ class MainWindowV2(MainWindow):
 
     def refresh_after_worker(self):
         if not self._v2_ready:return
+        if self._pending_diagnostic is not None and not self.operation_running():
+            diagnostic=self._pending_diagnostic
+            self._pending_diagnostic=None
+            self.finish_diagnostic(diagnostic)
+            return
         if self._rescan_after_worker and not self.operation_running():
             self._rescan_after_worker=False
             self.start_scan()
@@ -374,6 +383,14 @@ class MainWindowV2(MainWindow):
         if self.cover_host:self.cover_host.store.clear()
         super().finish_scan(games)
 
+    def finish_diagnostic(self, diagnostic):
+        # The worker's result arrives before QThread.finished. Dialogs may
+        # install, back up or recover, so hand off only after job cleanup.
+        if self.operation_running():
+            self._pending_diagnostic=diagnostic
+            return
+        super().finish_diagnostic(diagnostic)
+
     def _can_abandon(self):
         if self.operation_running():return False
         if not self.has_pending_changes():return True
@@ -394,7 +411,39 @@ class MainWindowV2(MainWindow):
             self._rescan_after_worker=True
             return
         if not self._can_abandon():return
+        if not self._initial_destination_checked:
+            self._initial_destination_checked=True
+            if self.root_path.resolve()==Path.cwd().resolve():
+                from ...dreamcast.storage_diagnostics import diagnose_storage
+                diagnostic=diagnose_storage(self.root_path)
+                if not (diagnostic.scan_allowed or diagnostic.write_allowed or diagnostic.prepare_allowed):
+                    self.open_setup_wizard()
+                    return
         super().start_scan()
+
+    def open_setup_wizard(self, diagnostic=None):
+        self.leave_bulk()
+        if not self._can_abandon():return
+        from .setup import SetupWizardV2
+        dialog=SetupWizardV2(diagnostic,self)
+        if dialog.exec()!=QDialog.DialogCode.Accepted:
+            self.settings=load_settings()
+            return
+        self.settings=load_settings()
+        if dialog.selected_path:
+            changed=Path(dialog.selected_path).resolve()!=self.root_path.resolve()
+            if changed:
+                self.games=[]
+                self.games_by_slot={}
+                self.bulk_proposals.clear()
+                self.cover_host.store.clear()
+                self.write_allowed=False
+                self.diagnostic=None
+                self.read_only_reason=tr('destination_unknown')
+                self.apply_filters()
+            self.path_edit.setText(str(dialog.selected_path))
+            self.root_path=dialog.selected_path
+            self.start_scan()
 
     def open_provider_settings(self):self.leave_bulk();super().open_provider_settings()
     def force_backup_current_sd(self):self.leave_bulk();super().force_backup_current_sd()

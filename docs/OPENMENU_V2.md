@@ -1,6 +1,6 @@
 # OpenMenu GDEMU Manager v2
 
-Version `2.0.0.dev2`, development branch `feature/openmenu-v2` based on `develop`.
+Version `2.0.0.dev3`, development branch `feature/openmenu-v2` based on `develop`.
 This is a real PySide6 application over the original services. It is not the
 HTML mockup or a simulation, and is not yet a hardware-validated public release.
 
@@ -21,12 +21,22 @@ supports palettes, backgrounds and music. V2 gives the default formal template
 the approved warm orange palette; explicitly selected external/arcade palettes
 are translated to the same semantic tokens. Templates cannot change action semantics.
 
+SD preparation now uses `ui/v2/setup.py`: compact destination selection, a clear
+status and next action, technical diagnostics on demand, and an explicit
+installation success state before entering the collection. Invalid edits revoke
+the old destination approval. An unrelated working directory is not presented
+as the user's SD at first run. Original diagnosis, installation and backup
+services remain authoritative. `retained_dialogs.py` registers backup, upgrade,
+review, providers/credentials, language, About and bulk progress presentation;
+standard messages and template inputs share command icons and translated labels.
+Native file pickers remain OS-owned. See [screen coverage and visual review](V2_DIALOG_DESIGN_AUDIT.md).
+
 ## Original functionality retained
 
 | Function | V2 integration |
 | --- | --- |
 | SD / backup folder diagnosis, FAT32 and write permission | Original diagnostic worker and safeguards; destination summary and reason visible. |
-| Empty SD setup, menu installation and old-menu upgrade | Original setup/upgrade dialogs, backup decisions and OpenMenu assets. |
+| Empty SD setup, menu installation and old-menu upgrade | Compact V2 setup and adapted original upgrade, preserving backup decisions and OpenMenu assets. |
 | Read games, names, IDs, regions and menu inconsistencies | Original scanner/models; compact table and full game information dialog. |
 | GDI/CDI file or recursive folder import | Real source inspection in a worker; explicit selection, global Todos, duplicates initially unchecked, invalid GDI blocked with reason. |
 | Add, remove, compact slots, write names and rebuild 01 | Original workers/slot transactions/rebuilder; changes remain pending until confirmed. |
@@ -95,7 +105,7 @@ python -m openmenu_gdemu_manager
 python -m openmenu_gdemu_manager --legacy-ui
 python scripts/validate_v2.py
 python scripts/validate_v2.py --check-docs
-./scripts/build_portable.ps1 -Version "2.0.0-dev2"
+./scripts/build_portable.ps1 -Version "2.0.0-dev3"
 ./dist/OpenMenuGDEMUManager-Portable/OpenMenuGDEMUManager.exe --self-test report.json
 ```
 

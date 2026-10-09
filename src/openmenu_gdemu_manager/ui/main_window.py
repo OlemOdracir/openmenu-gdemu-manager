@@ -1949,6 +1949,9 @@ def run(window_class=MainWindow):
         refresh_languages(configured_languages_dir(settings))
         if not bool(settings.get("ui", {}).get("language_prompted", False)):
             apply_template(app, configured_active_template(settings))
+            if getattr(window_class, 'uses_v2_design', False):
+                from .v2.design import apply_theme
+                apply_theme(app)
             dialog = LanguageSelectionDialog(available_languages())
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 language = dialog.selected_code

@@ -67,6 +67,7 @@ def apply_theme(app, value="light"):
     QLabel[title=true] {{ font-size: {METRICS['font-body']}px; font-weight: 600; }}
     QLabel[tone=success] {{ color: {c['success']}; }}
     QLabel[tone=warning] {{ color: {c['warning']}; }}
+    QLabel[tone=danger] {{ color: {c['danger']}; }}
     QLabel[tone=pending] {{ color: {c['success']}; font-weight: 600; }}
     QLabel[tone=region] {{ color: {c['focus']}; font-size: {METRICS['font-small']}px; }}
     QFrame#Card, QFrame#Reference {{ border: 1px solid {c['line']}; border-radius: {METRICS['radius']}px; background: {c['paper']}; }}
@@ -76,6 +77,14 @@ def apply_theme(app, value="light"):
     QFrame#Row[removed=true] {{ background: {c['soft']}; }}
     QFrame#Top {{ border-bottom: 1px solid {c['line']}; }}
     QFrame#Footer {{ border-top: 1px solid {c['line']}; }}
+    QWidget#WizardHero, QWidget#SecurityCard, QWidget#DiagnosticTile {{ background: {c['paper']}; border: 1px solid {c['line']}; border-radius: {METRICS['radius']}px; }}
+    QLabel#ChipWarning {{ background: {c['warning_soft']}; color: {c['warning']}; padding: 8px; border-radius: {METRICS['radius']}px; }}
+    QLabel#ChipInfo {{ background: {c['soft']}; color: {c['ink']}; padding: 8px; border-radius: {METRICS['radius']}px; }}
+    QLabel#TileTitle {{ color: {c['muted']}; font-size: {METRICS['font-small']}px; }}
+    QLabel#BusyTitle {{ font-weight: 600; }}
+    QLabel#BusyDetail {{ color: {c['muted']}; }}
+    QWidget#BusyOverlay {{ background: rgba(8, 15, 20, 0.55); }}
+    QWidget#BusyPanel {{ background: {c['paper']}; border: 1px solid {c['line']}; border-radius: {METRICS['radius']}px; }}
     QLabel#Guidance {{ background: {c['success_soft']}; color: {c['success']}; border-left: 3px solid {c['success']}; padding: 8px 12px; font-size: 12px; }}
     QLabel#Feedback {{ background: {c['soft']}; color: {c['muted']}; padding: 5px 12px; font-size: {METRICS['font-metadata']}px; }}
     QPushButton {{ min-height: 30px; border: 1px solid {c['line']}; border-radius: {METRICS['radius']}px; padding: 4px 8px; background: {c['paper']}; font-size: {METRICS['font-small']}px; }}
@@ -89,6 +98,12 @@ def apply_theme(app, value="light"):
     QPushButton[attention=true] {{ border: 2px solid {c['success']}; background: {c['success_soft']}; }}
     QPushButton:disabled {{ background: {c['soft']}; color: {c['muted']}; border-color: {c['line']}; font-weight: 400; }}
     QLineEdit, QComboBox {{ background: {c['paper']}; border: 1px solid {c['line']}; border-radius: 5px; padding: 6px 8px; min-height: 26px; font-size: 12px; }}
+    QSpinBox {{ background: {c['paper']}; border: 1px solid {c['line']}; border-radius: 5px; padding: 4px 8px; min-height: 26px; }}
+    QGroupBox {{ border: 1px solid {c['line']}; border-radius: 5px; margin-top: 12px; padding-top: 8px; }}
+    QProgressBar {{ border: 1px solid {c['line']}; border-radius: 5px; background: {c['soft']}; color: {c['ink']}; min-height: 16px; text-align: center; }}
+    QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}
+    QTableWidget {{ background: {c['paper']}; gridline-color: {c['line']}; selection-background-color: {c['accent_soft']}; selection-color: {c['ink']}; border: 1px solid {c['line']}; }}
+    QHeaderView::section {{ background: {c['surface']}; color: {c['muted']}; border: 0; border-bottom: 1px solid {c['line']}; padding: 6px; }}
     QScrollArea {{ border: none; background: {c['surface']}; }}
     QScrollBar:vertical {{ width: 12px; background: {c['soft']}; margin: 0; }}
     QScrollBar::handle:vertical {{ background: {c['muted']}; border-radius: 5px; min-height: 28px; }}
@@ -107,6 +122,9 @@ def apply_theme(app, value="light"):
             for action in widget.actions():
                 if action.objectName()=='query_clear':action.setIcon(icon('x'))
         widget.update()
+    from .retained_dialogs import install, refresh_all
+    install(app)
+    refresh_all(app)
 
 
 def repolish(widget):
