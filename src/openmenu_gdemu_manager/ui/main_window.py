@@ -816,7 +816,10 @@ class MainWindow(QMainWindow):
         complete = None
         revert = None
         if can_auto_recover:
-            complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+            if service.can_complete_recovery():
+                complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+            else:
+                message.setInformativeText(tr("slot_recovery.revert_in_progress"))
             revert = message.addButton(tr("slot_recovery.revert"), QMessageBox.ButtonRole.DestructiveRole)
         open_folder = message.addButton(tr("slot_recovery.open_folder"), QMessageBox.ButtonRole.ActionRole)
         later = message.addButton(tr("slot_recovery.later"), QMessageBox.ButtonRole.RejectRole)

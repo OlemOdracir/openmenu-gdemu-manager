@@ -1,6 +1,6 @@
 """Real file/folder inspection with explicit, reversible import selection."""
 from pathlib import Path
-from PySide6.QtCore import Qt,Signal,QObject
+from PySide6.QtCore import Qt,Signal,QObject,Slot
 from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QFileDialog,QTableWidget,QTableWidgetItem,QHeaderView,QMessageBox
 from ...core.models import RomLibraryEntry
 from ...dreamcast.rom_library import inspect_source,is_gdemu_menu_slot
@@ -42,6 +42,8 @@ class ImportGamesDialog(QDialog):
         super().__init__(parent)
         self.settings,self.games=settings,games
         self.entries=[];self.errors=[];self.checked=[];self.scan_thread=None;self.scan_worker=None
+        self._inspecting=False
+        self._inspection_error=''
         self.resize(960,620);self.setWindowTitle(tr('add_title'))
         root=QVBoxLayout(self);root.setContentsMargins(20,16,20,16)
         root.addWidget(label(tr('add_title'),heading=True))
@@ -73,12 +75,24 @@ class ImportGamesDialog(QDialog):
 
     def inspect_paths(self,paths):
         if self.scan_thread is not None:return
+        self._inspecting=True
+        self._inspection_error=''
         self.files.setEnabled(False);self.folder.setEnabled(False);self.prepare.setEnabled(False)
+        self.table.setEnabled(False);self.all.setEnabled(False)
         self.feedback.setText(tr('source_scanning'))
         start_worker(InspectWorker(paths,supported_media_types(self.settings)),'scan_thread','scan_worker',self,self.received,self.failed)
+        self.scan_thread.finished.connect(self.inspection_finished)
+        parent=self.parentWidget()
+        if parent is not None and hasattr(parent,'cover_jobs'):parent.cover_jobs.append(self.scan_thread)
+
+    @Slot()
+    def inspection_finished(self):
+        self._inspecting=False
+        self.files.setEnabled(True);self.folder.setEnabled(True);self.table.setEnabled(True)
+        self.sync()
+        if self._inspection_error:self.feedback.setText(tr('read_failed',reason=self._inspection_error))
 
     def received(self,records):
-        self.files.setEnabled(True);self.folder.setEnabled(True)
         known={entry.source_path.casefold() for entry in self.entries}
         for entry,error in records:
             if entry.source_path.casefold() in known:continue
@@ -88,7 +102,8 @@ class ImportGamesDialog(QDialog):
         self.render()
 
     def failed(self,message):
-        self.files.setEnabled(True);self.folder.setEnabled(True);self.feedback.setText(tr('read_failed',reason=message))
+        self._inspection_error=message
+        self.feedback.setText(tr('read_failed',reason=message))
 
     def render(self):
         self.table.setRowCount(len(self.entries))
@@ -112,9 +127,10 @@ class ImportGamesDialog(QDialog):
     def sync(self):
         count=sum(self.checked);targets=[i for i,error in enumerate(self.errors) if not error]
         self.all.setCheckState(Qt.CheckState.Checked if targets and all(self.checked[i] for i in targets) else Qt.CheckState.PartiallyChecked if count else Qt.CheckState.Unchecked)
-        self.all.setEnabled(bool(targets));self.prepare.setEnabled(bool(count))
-        self.feedback.setText(tr('detected_games',count=count,total=len(self.entries)))
+        self.all.setEnabled(bool(targets) and not self._inspecting);self.prepare.setEnabled(bool(count) and not self._inspecting)
+        if not self._inspecting:self.feedback.setText(tr('detected_games',count=len(self.entries),selected=count))
     def accept_selection(self):
+        if self._inspecting or self.scan_thread is not None:return
         entries=[entry for i,entry in enumerate(self.entries) if self.checked[i] and not self.errors[i]]
         if entries:self.selected.emit(entries);self.accept()
     def reject(self):

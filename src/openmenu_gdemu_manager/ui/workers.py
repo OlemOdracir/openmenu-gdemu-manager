@@ -28,7 +28,7 @@ from ..services.game_service import build_pending_game, next_free_slot
 from ..services.legacy_menu_upgrade import LegacyMenuUpgradeService
 from ..services.openmenu_rebuilder import OpenMenuRebuilder
 from ..services.search_log import append_search_event_for_game, summarize_candidates
-from ..services.sd_slot_transaction import SdSlotTransactionService
+from ..services.sd_slot_transaction import SdSlotTransactionService, ensure_no_incomplete_transactions
 from ..services.transaction_log import append_transaction, new_operation_id
 
 log = logging.getLogger(__name__)
@@ -570,10 +570,11 @@ class SaveChangesWorker(QObject):
     def run(self):
         operation_id = new_operation_id()
         transaction_summary: dict | None = None
-        preflight_completed = not self.validate_images
+        preflight_completed = False
         try:
             if not self.write_allowed:
                 raise PermissionError("La ruta actual esta en modo solo lectura; no se aplicaran cambios.")
+            ensure_no_incomplete_transactions(self.root_path)
             source_validator = None
             if self.validate_images:
                 from ..dreamcast.image_integrity import validate_source
@@ -581,7 +582,7 @@ class SaveChangesWorker(QObject):
                 for game in self.games:
                     if game.pending_add and not game.pending_delete:
                         validate_source(game.source_path)
-                preflight_completed = True
+            preflight_completed = True
             before_metadata = parse_openmenu_from_track(find_openmenu_track(self.root_path))
             deletions = [game for game in self.games if game.pending_delete and game.folder]
             additions = [game for game in self.games if game.pending_add and game.source_path]

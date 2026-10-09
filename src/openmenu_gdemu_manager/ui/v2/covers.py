@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 from PySide6.QtCore import Qt, QTimer, QSize, QPointF, Signal, QUrl
 from PySide6.QtGui import QPixmap, QDesktopServices, QPainter, QColor
-from PySide6.QtWidgets import QApplication, QDialog, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLineEdit, QStackedWidget, QSizePolicy, QGraphicsView, QGraphicsScene, QComboBox, QMenu
+from PySide6.QtWidgets import QApplication, QDialog, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLineEdit, QStackedWidget, QSizePolicy, QGraphicsView, QGraphicsScene, QComboBox, QMenu, QLayout
 
 from . import catalog
 from .catalog import tr, variant
@@ -120,6 +120,7 @@ class Gallery(QWidget):
         self.grid_widget = QWidget()
         self.grid_widget.setObjectName("Surface")
         self.grid = QGridLayout(self.grid_widget)
+        self.grid.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.grid.setContentsMargins(0,0,0,0)
         self.grid.setSpacing(8)
         self.scroll.setWidget(self.grid_widget)
@@ -164,6 +165,7 @@ class Gallery(QWidget):
         while self.grid.count():
             item = self.grid.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         # Reset stretches left by a different responsive arrangement.
         for i in range(6):
@@ -183,13 +185,21 @@ class Gallery(QWidget):
             self.grid_widget.setMinimumHeight(0)
         else:
             rows = ceil(6 / self.columns)
-            self.grid_widget.setMinimumHeight(rows * 152 + (rows-1)*8)
             for idx, card in enumerate(self.cards):
                 self.grid.addWidget(card, idx//self.columns, idx%self.columns)
+                card.ensurePolished()
+                card.setMinimumHeight(max(152,card.sizeHint().height()))
             for r in range(rows):
                 self.grid.setRowStretch(r, 1)
             for c in range(self.columns):
                 self.grid.setColumnStretch(c, 1)
+            # Native Windows/DPI metrics can make a card taller than 152px.
+            # Resolve its real minimum before scrolling/focus is positioned.
+            self.grid.invalidate()
+            self.grid.activate()
+            self.grid_widget.setMinimumHeight(max(rows * 152 + (rows-1)*8,self.grid.minimumSize().height()))
+            self.grid_widget.resize(self.grid_widget.width(),max(self.grid_widget.height(),self.grid_widget.minimumHeight()))
+            self.grid.setGeometry(self.grid_widget.rect())
         total = len(ws.store.candidates(ws.game))
         self.page_label.setText(tr("pagination", start=(ws.session.page-1)*6+1 if total else 0, end=min(ws.session.page*6,total), total=total, page=ws.session.page, pages=pages))
         self.previous.setEnabled(ws.session.page > 1)
@@ -218,7 +228,7 @@ class Gallery(QWidget):
         columns = 3 if self.width() >= 1000 else 2 if self.width() >= 700 else 1
         if columns != self.columns:
             self.columns = columns
-            QTimer.singleShot(0, self.populate)
+            self.populate()
 
 
 class ImageView(QGraphicsView):

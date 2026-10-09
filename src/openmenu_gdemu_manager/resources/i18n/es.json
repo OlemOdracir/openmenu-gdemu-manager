@@ -773,6 +773,7 @@
     "v2.quality": "Calidad",
     "v2.open_source": "Abrir origen de la imagen",
     "v2.open_cover_library": "Abrir carpeta de originales",
-    "v2.local_folder": "Carpeta local"
+    "v2.local_folder": "Carpeta local",
+    "slot_recovery.revert_in_progress": "La reversión ya está en curso. Reanúdala antes de volver a guardar; ya no se puede completar la operación original."
   }
 }

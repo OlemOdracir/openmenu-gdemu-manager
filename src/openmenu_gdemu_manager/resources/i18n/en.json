@@ -773,6 +773,7 @@
     "v2.quality": "Quality",
     "v2.open_source": "Open image source",
     "v2.open_cover_library": "Open originals folder",
-    "v2.local_folder": "Local folder"
+    "v2.local_folder": "Local folder",
+    "slot_recovery.revert_in_progress": "Reversal is already in progress. Resume reversal before starting another save; completing the original operation is no longer available."
   }
 }

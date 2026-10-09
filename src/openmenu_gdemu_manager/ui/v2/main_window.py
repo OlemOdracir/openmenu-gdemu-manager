@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QHead
 from ... import APP_NAME
 from ...i18n import tr as legacy_tr
 from ...core.image_quality import analyze_image
+from ...services.sd_slot_transaction import incomplete_slot_transactions
 from ..main_window import MainWindow
 from ..widgets import GamesTableModel,ThemeBackgroundWidget,BusyOverlay
 from ..workers import BulkWorker,SaveChangesWorker
@@ -293,20 +294,27 @@ class MainWindowV2(MainWindow):
     def save_changes_to_sd(self,confirm=True):
         self.leave_bulk()
         if not self.ensure_write_allowed() or self.operation_running():return
+        prepared=[]
         if self.cover_host:
             for view in self.cover_host.store.plan():
                 if view.real.pending_delete:continue
                 key=view.choice;image=self.cover_host.store.image(key);quality=analyze_image(image)
                 if not quality.accepted:raise ValueError(quality.warning)
-                self._persist_cover_selection(view.real,self.cover_host.store.candidate_objects[key],image,quality,'seleccionada',persist_state=not view.real.pending_add)
-                view.real.has_placeholder_cover=False
-                self.bulk_proposals.pop(view.real.slot,None)
+                prepared.append((view,key,image,quality))
         if not self.has_pending_changes():return
         if confirm:
-            covers=sum(g.save_status=='pendiente_guardar' and bool(g.selected_image) and not g.pending_delete for g in self.games)
+            cover_slots={g.slot for g in self.games if g.save_status=='pendiente_guardar' and bool(g.selected_image) and not g.pending_delete}
+            cover_slots.update(view.real.slot for view,_,_,_ in prepared)
+            covers=len(cover_slots)
             counts=self._pending_apply_counts(cover_override=covers)
             dialog=ConfirmApplyDialog(self.root_path,counts['covers'],counts['additions'],counts['deletions'],self,slot_moves=counts['slot_moves'],product_updates=counts['product_updates'])
             if dialog.exec()!=QDialog.DialogCode.Accepted:self.apply_filters();return
+        # A rejected review must leave the draft, GameItem and local cover
+        # library untouched, so Discard/Keep cannot apply a hidden selection.
+        for view,key,image,quality in prepared:
+            self._persist_cover_selection(view.real,self.cover_host.store.candidate_objects[key],image,quality,'seleccionada',persist_state=not view.real.pending_add)
+            view.real.has_placeholder_cover=False
+            self.bulk_proposals.pop(view.real.slot,None)
         self.start_busy(legacy_tr('action.save_changes'),str(self.root_path))
         worker=SaveChangesWorker(self.root_path,self.games,self.state,write_allowed=self.write_allowed,validate_images=True)
         self._start_worker(worker,'save_thread','save_worker',on_finished=self.save_finished,on_error=self.save_error,extra=[(worker.progress,self.save_progress)])
@@ -315,6 +323,13 @@ class MainWindowV2(MainWindow):
     def save_bulk_proposals(self,confirm=True):
         self.leave_bulk()
         if self.ensure_write_allowed() and not self.operation_running():super().save_bulk_proposals(confirm=confirm)
+
+    def _finish_save_bulk(self,results):
+        for result in results:
+            if result.get('error'):continue
+            game=self._game_by_slot(result['slot'])
+            if game is not None:self.remember_game(game)
+        super()._finish_save_bulk(results)
 
     def _start_worker(self,worker,*args,**kwargs):
         if isinstance(worker,BulkWorker):worker.write_allowed=self.write_allowed
@@ -334,6 +349,20 @@ class MainWindowV2(MainWindow):
         self._before_edits.clear()
         self.cover_host.store.clear()
         super().save_finished(message)
+
+    def ensure_write_allowed(self):
+        if incomplete_slot_transactions(self.root_path):
+            self.write_allowed=False
+            self.read_only_reason=legacy_tr('slot_recovery.pending')
+            self._refresh_controls()
+        return super().ensure_write_allowed()
+
+    def save_error(self,message):
+        if incomplete_slot_transactions(self.root_path):
+            self.write_allowed=False
+            self.read_only_reason=legacy_tr('slot_recovery.pending')
+        super().save_error(message)
+        self._refresh_controls()
 
     def operation_running(self):
         for name in ('scan_thread','diagnostic_thread','legacy_upgrade_thread','add_thread','save_thread','bulk_thread','save_bulk_thread'):

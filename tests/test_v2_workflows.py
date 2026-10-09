@@ -84,8 +84,10 @@ def test_gallery_six_whole_images_and_reachable_buttons(window,size):
         session.results.append(key)
     ws=ProductionWorkspace(window.cover_host,game,auto_search=False);ws.resize(*size);ws.show();QTest.qWait(60)
     assert len(ws.gallery.cards)==6 and ws.gallery.next.isEnabled()
-    for card in ws.gallery.cards:
-        assert card.choose.geometry().bottom()<=card.height()
+    for position,card in enumerate(ws.gallery.cards):
+        button_bottom=card.choose.mapTo(card,card.choose.rect().bottomRight())
+        assert button_bottom.y()<card.height()
+        assert all(not card.geometry().intersects(previous.geometry()) for previous in ws.gallery.cards[:position])
         assert card.image.pm.width()>=512
     last=ws.gallery.cards[-1]
     ws.gallery.scroll.ensureWidgetVisible(last.choose);QApplication.processEvents()
@@ -132,6 +134,38 @@ def test_import_selection_invalid_blocked_duplicate_unchecked(window):
     assert [item.name for item in emitted]==['Covered','New']
 
 
+@pytest.mark.parametrize('language',['en','es'])
+def test_import_feedback_formats_actual_detected_and_selected_counts(window,language):
+    set_language(language)
+    dialog=ImportGamesDialog(window.settings,window.games,window)
+    dialog.received([(RomLibraryEntry('New','CDI','new.cdi'),''),(RomLibraryEntry('Covered','CDI','covered.cdi'),'')])
+    assert '{' not in dialog.feedback.text()
+    assert dialog.feedback.text()==catalog.tr('detected_games',count=2,selected=1)
+    dialog.toggle(0,False)
+    assert dialog.feedback.text()==catalog.tr('detected_games',count=2,selected=0)
+    dialog.reject();set_language('es')
+
+
+def test_import_cannot_accept_or_enable_prepare_while_inspection_runs(window,monkeypatch):
+    import time
+    from openmenu_gdemu_manager.ui.v2 import import_games
+    dialog=ImportGamesDialog(window.settings,window.games,window)
+    dialog.received([(RomLibraryEntry('Ready','CDI','ready.cdi'),'')])
+    def slow(worker):
+        time.sleep(.15);worker.finished.emit([])
+    monkeypatch.setattr(import_games.InspectWorker,'run',slow)
+    emitted=[];dialog.selected.connect(emitted.extend)
+    dialog.inspect_paths(['unused'])
+    dialog.toggle(0,True);dialog.accept_selection()
+    assert not emitted and not dialog.prepare.isEnabled() and not dialog.table.isEnabled()
+    assert dialog.scan_thread in window.cover_jobs
+    for _ in range(100):
+        QTest.qWait(10)
+        if dialog.scan_thread is None:break
+    assert dialog.scan_thread is None and dialog.prepare.isEnabled() and dialog.table.isEnabled()
+    dialog.accept_selection();assert [entry.name for entry in emitted]==['Ready']
+
+
 def test_save_does_not_auto_accept_bulk_proposals(window,monkeypatch):
     candidate=Candidate('test','Proposal',99)
     window.bulk_proposals={3:BulkProposal(3,candidate,Image.new('RGB',(512,512)),status='seleccionada')}
@@ -139,6 +173,49 @@ def test_save_does_not_auto_accept_bulk_proposals(window,monkeypatch):
     called=[];monkeypatch.setattr(window,'save_bulk_proposals',lambda **kw:called.append('unexpected'))
     window.save_changes_to_sd(confirm=False)
     assert called==[] and not window.games[1].selected_image
+
+
+@pytest.mark.parametrize('action',['discard','keep'])
+def test_cancelled_cover_review_cannot_leave_hidden_selection(window,monkeypatch,action):
+    import copy
+    from PySide6.QtWidgets import QDialog
+    from openmenu_gdemu_manager.ui.v2 import main_window as v2
+    game=window.games[0];store=window.cover_host.store;view=store.view(game)
+    key=store.add_candidate(view,Candidate('test','Blue',99),Image.new('RGB',(512,512),'blue'))
+    store.choose(view,key)
+    before=copy.deepcopy(game.__dict__);state=copy.deepcopy(window.state)
+    persisted=[];workers=[]
+    monkeypatch.setattr(window,'_persist_cover_selection',lambda *a,**kw:persisted.append(a))
+    monkeypatch.setattr(v2.ConfirmApplyDialog,'exec',lambda self:QDialog.DialogCode.Rejected)
+    window.save_changes_to_sd()
+    assert not persisted and game.__dict__==before and window.state==state
+    assert view.choice==key
+    if action=='discard':store.discard(view)
+    else:assert store.choose(view,view.cover)=='kept'
+    assert not window.has_pending_changes()
+    monkeypatch.setattr(legacy,'update_game_state',lambda *a:None)
+    window.save_game_name(window.games[1],'Another name')
+    monkeypatch.setattr(window,'start_busy',lambda *a:None)
+    monkeypatch.setattr(window,'_start_worker',lambda worker,*a,**kw:workers.append(worker))
+    window.save_changes_to_sd(confirm=False)
+    assert not persisted and not game.selected_image and len(workers)==1
+
+
+def test_cover_materialization_occurs_only_after_accepted_review(window,monkeypatch):
+    from PySide6.QtWidgets import QDialog
+    from openmenu_gdemu_manager.ui.v2 import main_window as v2
+    store=window.cover_host.store;view=store.view(window.games[1]);events=[]
+    key=store.add_candidate(view,Candidate('test','Blue',99),Image.new('RGB',(512,512),'blue'))
+    store.choose(view,key)
+    def review(dialog):
+        assert not view.real.selected_image
+        events.append('review');return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(v2.ConfirmApplyDialog,'exec',review)
+    monkeypatch.setattr(window,'_persist_cover_selection',lambda *a,**kw:events.append('persist'))
+    monkeypatch.setattr(window,'start_busy',lambda *a:None)
+    monkeypatch.setattr(window,'_start_worker',lambda *a,**kw:events.append('worker'))
+    assert window.save_changes_to_sd() is True
+    assert events==['review','persist','worker']
 
 
 def test_search_worker_delivers_on_gui_thread(window,monkeypatch):
@@ -161,6 +238,8 @@ def test_all_actions_have_resources_and_translations():
     for action,spec in catalog.ACTIONS.items():
         assert (catalog.REFERENCE/'icons'/f"{spec['icon']}.svg").is_file()
         for language in ('en','es'):assert 'v2.action.'+action in load_internal_language(language).strings
+    for language in ('en','es'):
+        assert 'slot_recovery.revert_in_progress' in load_internal_language(language).strings
 
 
 def test_original_functions_remain_available(window):
@@ -175,6 +254,32 @@ def test_discard_restores_name_state_without_deleting_history(window,monkeypatch
     game=window.games[1];window.save_game_name(game,'Edited')
     window.discard_pending_changes()
     assert game.name=='Missing' and not window.has_pending_changes()
+
+
+def test_discard_restores_bulk_cover_after_sd_save_failure(window,monkeypatch,tmp_path):
+    from openmenu_gdemu_manager.core.image_quality import analyze_image
+    from openmenu_gdemu_manager.config import state
+    monkeypatch.setattr(state,'flush_state',lambda *a:None)
+    monkeypatch.setattr(legacy,'update_game_state',lambda *a:None)
+    monkeypatch.setattr(legacy,'export_reports',lambda *a:None)
+    monkeypatch.setattr(window,'show_error',lambda *a:None)
+    game=window.games[1]
+    window.apply_after_bulk_save=False
+    path=tmp_path/'bulk.png';Image.new('RGB',(512,512),'blue').save(path)
+    result={'slot':game.slot,'status':'seleccionada','normalized':str(path),'original':str(path),'preview':str(path),'source':'test','score':99,'quality':analyze_image(Image.open(path))}
+    window._finish_save_bulk([result]);window.save_error('synthetic save failure')
+    assert game.selected_image and window.has_pending_changes()
+    window.discard_pending_changes()
+    assert not game.selected_image and game.has_placeholder_cover and not window.has_pending_changes()
+
+
+def test_failed_slot_transaction_disables_v2_writes_until_recovery(window,monkeypatch):
+    from openmenu_gdemu_manager.services.sd_slot_transaction import SdSlotTransactionService
+    SdSlotTransactionService(window.root_path,'failed')._write_state('failed')
+    monkeypatch.setattr(window,'show_error',lambda *a:None)
+    window.save_error('failed transaction')
+    assert not window.write_allowed and window.read_only_reason
+    assert not window.add_game_button.isEnabled() and not window.save_changes_button.isEnabled()
 
 
 def test_identical_cover_kept_and_tonal_variant_is_distinct(window):

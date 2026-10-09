@@ -1,6 +1,6 @@
 # OpenMenu GDEMU Manager v2
 
-Version `2.0.0.dev1`, development branch `feature/openmenu-v2` based on `develop`.
+Version `2.0.0.dev2`, development branch `feature/openmenu-v2` based on `develop`.
 This is a real PySide6 application over the original services. It is not the
 HTML mockup or a simulation, and is not yet a hardware-validated public release.
 
@@ -56,9 +56,11 @@ are translated to the same semantic tokens. Templates cannot change action seman
    the web do not choose it or write to the SD. Keeping the current image does
    not prepare a replacement. Exact image duplicates are merged; different
    scans/tones remain alternatives under the original deduplication rules.
-6. Review and save persists the intentional choices through the original cover
-   service, then confirms the storage plan and uses the transactional worker.
-   A cancelled confirmation retains pending choices. Successful save rescans
+6. Review and save validates the intentional choices and confirms the storage
+   plan before materializing them through the original cover service and
+   starting the transactional worker. Cancelling leaves drafts and local cover
+   state untouched; Discard/Keep can remove the choice without a hidden save.
+   Successful save rescans
    after its thread finishes. Unchosen bulk proposals are excluded from manual Save.
 7. Closing/changing destination/rescanning asks before abandoning pending work.
    Discard restores local edited state and clears session changes; archived
@@ -74,6 +76,10 @@ tracks, incomplete sectors and provable ISO9660 volume truncation before an
 addition can mutate the SD. It validates the staged destination again before
 publishing a slot. A failed copy remains recoverable through original transaction
 metadata. Existing GDEMU.ini is preserved, with no guessed configuration changes.
+Recovery revalidates source and staging, records ownership of published additions
+and retains it after late failures. Pending transactions block new writes from
+both the worker and service until completed/reverted. Reversal evacuates owned
+published moves before restoring originals, including slot reorder cycles.
 
 These checks are structural. CDI internal bounds and deeper disc checksum/extents
 audits remain release work; a non-empty CDI is not certified intact. A GDI with
@@ -89,12 +95,15 @@ python -m openmenu_gdemu_manager
 python -m openmenu_gdemu_manager --legacy-ui
 python scripts/validate_v2.py
 python scripts/validate_v2.py --check-docs
-./scripts/build_portable.ps1 -Version "2.0.0-dev1"
+./scripts/build_portable.ps1 -Version "2.0.0-dev2"
 ./dist/OpenMenuGDEMUManager-Portable/OpenMenuGDEMUManager.exe --self-test report.json
 ```
 
 The harness regenerates [validation evidence](V2_VALIDATION.md). Re-run it after
 V2 code/resource/test changes; `--check-docs` rejects stale source evidence.
+On Windows it also tests UI flows with the native Qt backend at the system DPI,
+because offscreen measurements alone can miss native layout changes.
+See the [independent audit and corrections](V2_INDEPENDENT_AUDIT.md).
 The self-test verifies native startup and packaged icons without SD/network work.
 Generated artifacts, caches, ROMs, real library inventories and mockup sample
 covers must not be committed. No new third-party dependency was introduced.
@@ -108,6 +117,9 @@ the repository's existing commit-msg/pre-push hooks.
 - Portable launch in a clean Windows VM, beyond this development PC.
 - Real searches against enabled providers; automated network tests are skipped.
 - CDI internal descriptor/track validation and unusual GDI layouts.
+- Runtime inspection/reporting of missing or invalid GDEMU.ini. Preservation is
+  implemented; semantic configuration diagnosis from the launch protocol remains
+  pending and must not be inferred from the structural image checks.
 - A disposable backed-up SD and Dreamcast/GDEMU test: setup, add GDI/CDI, rename,
   change covers, remove/compact, then actually launch each game.
 
