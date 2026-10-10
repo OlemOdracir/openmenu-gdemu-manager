@@ -1,6 +1,6 @@
 # OpenMenu GDEMU Manager v2
 
-Version `2.0.0.dev4`, development branch `feature/openmenu-v2` based on `develop`.
+Version `2.0.0.dev5`, development branch `feature/openmenu-v2` based on `develop`.
 This is a real PySide6 application over the original services. It is not the
 HTML mockup or a simulation, and is not yet a hardware-validated public release.
 
@@ -38,7 +38,7 @@ Native file pickers remain OS-owned. See [screen coverage and visual review](V2_
 | SD / backup folder diagnosis, FAT32 and write permission | Original diagnostic worker and safeguards; destination summary and reason visible. |
 | Empty SD setup, menu installation and old-menu upgrade | Compact V2 setup and adapted original upgrade, preserving backup decisions and OpenMenu assets. |
 | Read games, names, IDs, regions and menu inconsistencies | Original scanner/models; compact table and full game information dialog. |
-| GDI/CDI file or recursive folder import | Real source inspection in a worker; explicit selection, global Todos, duplicates initially unchecked, invalid GDI blocked with reason. |
+| GDI/CDI file or recursive folder import | Real source inspection in a worker; explicit selection, global Todos, duplicates initially unchecked, invalid GDI/CDI blocked with reason; unsupported CDI profiles distinguished. |
 | Add, remove, compact slots, write names and rebuild 01 | Original workers/slot transactions/rebuilder; changes remain pending until confirmed. |
 | Search providers, matching thresholds and caching | Original search services/settings; remote image preparation stays outside the UI thread. |
 | Automatic bulk proposals and batch approval | Original bulk workers/quality rules; proposals do not automatically become a manual Save. Explicit batch Save retains the original review/confirmation. |
@@ -54,8 +54,9 @@ Native file pickers remain OS-owned. See [screen coverage and visual review](V2_
 1. Selecting a destination diagnoses it before any write. A folder that cannot
    be written remains inspectable when the original diagnostic allows scanning.
 2. Source import is separate from SD contents. Preparing games adds pending
-   rows; it does not copy files. Invalid sources show a reason. CDI currently
-   receives a basic non-empty check, not an internal disc integrity guarantee.
+   rows; it does not copy files. Invalid sources show a reason. Supported CDI
+   descriptors and declared track bounds are checked; unknown layouts require
+   review. No structural check guarantees payload integrity or game boot.
 3. Entering bulk mode checks only games without covers. Todos affects the entire
    collection, independent of filters. Clicking a row or its checkbox toggles
    once. Search selected keeps the mode; individual search/info/remove, import,
@@ -97,8 +98,12 @@ and retains it after late failures. Pending transactions block new writes from
 both the worker and service until completed/reverted. Reversal evacuates owned
 published moves before restoring originals, including slot reorder cycles.
 
-These checks are structural. CDI internal bounds and deeper disc checksum/extents
-audits remain release work; a non-empty CDI is not certified intact. A GDI with
+These checks are structural. Supported CDI footer/track layouts now receive
+bounded descriptor and extent validation before import, before any addition
+mutates storage, after staging and during recovery. Unsupported layouts are
+reported for review separately from confirmed structural failures. Deeper disc
+checksum/filesystem-extents audits remain separate work; a structurally checked
+CDI is not certified intact or bootable. See [CDI contract](CDI_VALIDATION.md). A GDI with
 no supported filesystem size evidence can still be truncated on a whole sector
 boundary without this validator proving it. Bootability requires hardware evidence.
 See [launch protocol](VALIDATION_GAME_LAUNCH.md).
@@ -111,7 +116,7 @@ python -m openmenu_gdemu_manager
 python -m openmenu_gdemu_manager --legacy-ui
 python scripts/validate_v2.py
 python scripts/validate_v2.py --check-docs
-./scripts/build_portable.ps1 -Version "2.0.0-dev4"
+./scripts/build_portable.ps1 -Version "2.0.0-dev5"
 ./dist/OpenMenuGDEMUManager-Portable/OpenMenuGDEMUManager.exe --self-test report.json
 ```
 
@@ -130,13 +135,27 @@ the repository's existing commit-msg/pre-push hooks.
 
 ## Remaining release checks
 
-- Portable launch in a clean Windows VM, beyond this development PC.
+- Portable launch in a clean Windows VM, beyond this development PC; use
+  [the acceptance protocol](V2_EXTERNAL_ACCEPTANCE.md).
 - Private/credentialed provider checks as configured by the user. Public OpenMenu,
   Libretro and Cover API search/download/decoding passed the opt-in tests; see
   [provider evidence](V2_PROVIDER_VALIDATION.md). Offline suites still skip network calls.
-- CDI internal descriptor/track validation and unusual GDI layouts.
+- Real-world CDI variants outside the supported structural profiles, deeper
+  checksums/filesystem extents and unusual GDI layouts.
 - A disposable backed-up SD and Dreamcast/GDEMU test: setup, add GDI/CDI, rename,
   change covers, remove/compact, then actually launch each game.
 
 The original v1 remains available through `--legacy-ui`. Its existing checkout
 and portable installation are not replaced by creating this branch/build.
+
+## Agent access
+
+A read-only headless CLI now shares validation/diagnostic services with the
+application. `python -m openmenu_gdemu_manager.cli --language es validate-image
+"path/to/disc.cdi"` returns schema-versioned JSON and a categorized exit code.
+`diagnose-storage "path/to/destination"` requires an explicit path and performs no
+automatic drive discovery. It does not authorize or execute writes.
+[MCP evaluation](MCP_EVALUACION.md) recommends an optional local stdio adapter
+using the official SDK. No MCP server or remote API is activated in this phase.
+The source installation provides the CLI entry point; the GUI portable does not
+include a separate console executable.

@@ -468,3 +468,44 @@ def test_empty_installed_collection_does_not_say_menu_is_missing(window, languag
     window.diagnostic=None;window.write_allowed=False
     window._refresh_controls()
     assert window.guidance.text()==catalog.tr('destination_unknown')
+
+
+@pytest.mark.parametrize('language', ['en', 'es'])
+@pytest.mark.parametrize('state', ['checked', 'invalid', 'unsupported'])
+def test_cdi_import_uses_real_validation_and_clear_status(window, tmp_path, monkeypatch, language, state):
+    from cdi_fixtures import classic_cdi
+    from openmenu_gdemu_manager.ui.v2 import import_games
+    set_language(language)
+    image = classic_cdi(tmp_path/'generated.cdi', payload_cut=2048 if state == 'invalid' else 0)
+    if state == 'unsupported':
+        payload = bytearray(image.read_bytes()); payload[-8:-4] = b'\x09\x00\x00\x80'; image.write_bytes(payload)
+    monkeypatch.setattr(import_games, 'inspect_source', lambda path, supported: RomLibraryEntry('Synthetic CDI', 'CDI', str(path)))
+    records = []; errors = []
+    worker = import_games.InspectWorker([image], {'CDI'})
+    worker.finished.connect(records.extend); worker.error.connect(errors.append); worker.run()
+    assert not errors and len(records) == 1
+    dialog = ImportGamesDialog(window.settings, window.games, window); dialog.received(records)
+    dialog.show(); QApplication.instance().processEvents()
+    check = dialog.table.cellWidget(0, 0)
+    if state == 'checked':
+        assert check.isEnabled() and check.isChecked()
+        assert dialog.table.item(0, 4).text() == catalog.tr('source_cdi_checked')
+        assert dialog.table.item(0, 4).toolTip() == catalog.tr('source_cdi_scope')
+        assert dialog.prepare.isEnabled()
+    else:
+        assert not check.isEnabled() and not check.isChecked() and not dialog.prepare.isEnabled()
+        reason = dialog.table.item(0, 4).toolTip()
+        assert ('requiere revisión' if language == 'es' else 'needs review') in reason if state == 'unsupported' else ('inválido' if language == 'es' else 'Invalid') in reason
+    import os
+    capture = os.environ.get('OPENMENU_V2_CAPTURE_DIR')
+    if capture:
+        folder = Path(capture); folder.mkdir(parents=True, exist_ok=True)
+        dialog.grab().save(str(folder/f'cdi-import-{language}-{state}.png'))
+    from PySide6.QtWidgets import QLabel
+    assert any(label.text() == catalog.tr('prepare_real_hint') for label in dialog.findChildren(QLabel))
+    header = dialog.table.horizontalHeader()
+    assert header.fontMetrics().horizontalAdvance(catalog.tr('format')) + 20 <= header.sectionSize(3)
+    before = image.read_bytes()
+    dialog.reject(); dialog.deleteLater(); QApplication.instance().processEvents()
+    assert image.read_bytes() == before
+    set_language('es')

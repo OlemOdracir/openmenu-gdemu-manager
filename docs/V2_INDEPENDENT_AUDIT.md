@@ -66,7 +66,9 @@ development package.
 
 - Clean Windows environment and private/credentialed provider searches. Public
   provider checks were completed in the dev4 follow-up below.
-- CDI internal descriptor/track-bound validation and unusual GDI layouts.
+- Real-world unsupported CDI layouts, deeper payload/filesystem checks and
+  unusual GDI layouts. Supported CDI descriptor/track-bound validation was
+  completed in the dev5 follow-up below.
 - Firmware interpretation and game launch on real hardware. Read-only root
   GDEMU.ini diagnosis was completed in the dev4 follow-up below.
 - Backed-up disposable SD and actual Dreamcast/GDEMU game launch checks, following
@@ -142,3 +144,43 @@ The final harness recorded **355 passed / 6 skipped**, with **74 UI-flow passes*
 for each offscreen 1.25, offscreen 1.5 and native Windows system-DPR run. No
 reproducible blocker remained within this scope. This approval does not certify
 clean Windows, physical SD/Dreamcast, deep CDI validation or private providers.
+
+## CDI and read-only agent queries - 2026-10-09
+
+Dev5 adds an original bounded CDI structural parser and headless Python/JSON
+queries. A separate reviewer, without conversation history, checked current
+source, synthetic fixtures, primary format references, original transaction
+integration, query side effects and six native EN/ES import states. Initial
+approval was withheld for stale UI scope text, inconsistent CLI error envelopes,
+GDI access failures reported as corruption, untranslated diagnostic fields,
+historical signed-index interpretation and a clipped format heading.
+
+All six findings were corrected and independently reproduced. The reviewer ran
+111 focused tests, checked both CLI failure envelopes, exercised an actual
+GDI read denial, inspected EN/ES reason codes, and visually reviewed six native
+screenshots. High-bit indices now require review rather than an unsupported
+corruption claim. No remaining concrete defect was found in this scope. The
+reviewer explicitly approved the CDI parser, read-only queries/CLI and their
+presentation; delivery closure still requires final generated regression and
+portable startup evidence.
+
+This review does not certify payload checksums/filesystem integrity, every
+real-world CDI layout, firmware support, clean Windows, physical SD or Dreamcast
+launch. MCP remains a documented proposal: there is no MCP server/SDK integration
+or initialize/tools/list/tools/call evidence. Queries do not enumerate drives,
+start GUI/migrations or perform writes. The CLI requires an explicit destination.
+
+The final mandatory harness passed 422 tests / 6 skips, followed by 80 UI-flow
+passes each at offscreen 1.25, offscreen 1.5 and native Windows system DPR 2.5.
+The freshness check confirms its generated source digest. Source and portable
+startup report dev5 with icons/startup true and no errors. The independent
+package review confirmed ZIP/sidecar hash, CRC of 474 entries, archived/built
+EXE identity, and embedded CDI/storage/UI bytecode plus EN/ES JSON correspondence
+with the final source. There is no separate CLI or MCP transport in the GUI
+portable; the source CLI was also exercised through its installed entry point.
+
+Final explicit independent disposition: **dev5 approved for local development
+and delivery**, with no reproducible blocker in the audited scope. The reviewer
+independently checked generated XML counts/digest, archive correspondence and a
+fresh installed-CLI call on a synthetic CDI without runtime/document migration.
+This closes the local integration conditions, not the remaining release gates.

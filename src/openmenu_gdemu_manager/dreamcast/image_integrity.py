@@ -3,22 +3,19 @@ import shlex
 from pathlib import Path
 
 
-class ImageIntegrityError(ValueError):pass
+from .image_errors import ImageIntegrityError
+from .cdi import inspect_cdi
 
 
 def validate_source(source):
     path=Path(source)
     if not path.exists():raise ImageIntegrityError(f'Source missing: {path}')
     descriptors=[path] if path.is_file() and path.suffix.lower()=='.gdi' else list(path.glob('*.gdi')) if path.is_dir() else []
-    if descriptors:
-        for descriptor in descriptors:validate_gdi(descriptor)
-        return
+    for descriptor in descriptors:validate_gdi(descriptor)
     cdis=[path] if path.is_file() and path.suffix.lower()=='.cdi' else list(path.glob('*.cdi')) if path.is_dir() else []
-    if not cdis:raise ImageIntegrityError(f'No GDI/CDI image found: {path}')
+    if not descriptors and not cdis:raise ImageIntegrityError(f'No GDI/CDI image found: {path}')
     for cdi in cdis:
-        if not cdi.stat().st_size:raise ImageIntegrityError(f'Empty CDI: {cdi.name}')
-    # CDI retains original compatibility. Its internal track bounds need a
-    # dedicated parser; callers must not describe this check as full validation.
+        inspect_cdi(cdi)
 
 
 def validate_gdi(descriptor):

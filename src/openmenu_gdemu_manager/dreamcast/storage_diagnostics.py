@@ -84,6 +84,7 @@ class StorageDiagnostic:
     summary: RouteSummary | None = None
     menu: MenuDiagnostic | None = None
     configuration: GdemuConfiguration | None = None
+    reason_code: str = "unspecified"
 
     @property
     def is_blocked(self) -> bool:
@@ -97,34 +98,34 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
 
     if not summary.exists:
         return _diagnostic(root, ROUTE_UNKNOWN, HEALTH_NOT_ACCESSIBLE, MENU_UNKNOWN, False, False,
-                           "La ruta no existe o no es accesible.", warnings, summary)
+                           "La ruta no existe o no es accesible.", warnings, summary, reason_code='path_unreadable')
 
     try:
         entries = list(root.iterdir())
     except OSError as exc:
         return _diagnostic(root, ROUTE_UNKNOWN, HEALTH_NOT_ACCESSIBLE, MENU_UNKNOWN, False, False,
-                           f"No se pudo leer la ruta: {exc}", warnings, summary)
+                           f"No se pudo leer la ruta: {exc}", warnings, summary, reason_code='path_unreadable')
 
     lowered = {entry.name.lower() for entry in entries}
     if lowered & CORRUPTION_NAMES or any(entry.suffix.lower() == ".chk" for entry in entries if entry.is_file()):
         return _diagnostic(root, ROUTE_UNKNOWN, HEALTH_POSSIBLE_CORRUPTION, MENU_UNKNOWN, False, False,
                            "La ruta presenta señales de corrupcion. La app no intentara reparar ni escribir.",
-                           warnings, summary)
+                           warnings, summary, reason_code='possible_corruption')
 
     if summary.is_root and summary.drive_type == "fixed":
         return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, MENU_UNKNOWN, False, False,
                            "La ruta parece la raiz de un disco interno. Por seguridad no se usara como SD.",
-                           warnings, summary)
+                           warnings, summary, reason_code='internal_root')
 
     if lowered & DANGEROUS_NAMES:
         return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, MENU_UNKNOWN, False, False,
                            "La ruta contiene carpetas de sistema o datos personales. No parece una SD GDEMU.",
-                           warnings, summary)
+                           warnings, summary, reason_code='system_folders')
 
     if summary.drive_type == "removable" and summary.filesystem and summary.filesystem.upper() != "FAT32":
         return _diagnostic(root, ROUTE_UNKNOWN, HEALTH_NOT_FAT32, MENU_UNKNOWN, False, False,
                            f"La unidad removible usa {summary.filesystem}; GDEMU requiere FAT32.",
-                           warnings, summary)
+                           warnings, summary, reason_code='not_fat32')
 
     relevant_entries = [entry for entry in entries if not _is_ignored_empty_entry(entry)]
     if not relevant_entries:
@@ -132,7 +133,7 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
         health = HEALTH_OK if summary.drive_type == "removable" else HEALTH_LOCAL_FOLDER
         return _diagnostic(root, route_class, health, MENU_NO_MENU, False, False,
                            "La ruta esta vacia. Primero se debe instalar OpenMenu base.",
-                           warnings, summary, prepare_allowed=True)
+                           warnings, summary, prepare_allowed=True, reason_code='empty')
 
     numeric = [entry for entry in entries if entry.is_dir() and entry.name.isdigit()]
     non_numeric = [entry for entry in relevant_entries if not (entry.is_dir() and entry.name.isdigit())]
@@ -143,30 +144,30 @@ def diagnose_storage(root: Path) -> StorageDiagnostic:
         if menu.detail.startswith("No se pudo leer el track openMenu"):
             return _diagnostic(root, ROUTE_GDEMU_STRUCTURE, HEALTH_POSSIBLE_CORRUPTION, menu.state, False, False,
                                "No se pudo leer el track openMenu. La app no intentara reparar ni escribir.",
-                               warnings, summary, menu)
+                               warnings, summary, menu, reason_code='menu_unreadable')
         if len(non_numeric) > 20:
             return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, menu.state, False, False,
                                "Hay demasiadas entradas no numericas junto a la estructura GDEMU.",
-                               warnings, summary, menu)
+                               warnings, summary, menu, reason_code='too_many_entries')
         route_class = ROUTE_GDEMU_STRUCTURE if summary.drive_type == "removable" else ROUTE_LOCAL_BACKUP
         health = HEALTH_OK if summary.drive_type == "removable" else HEALTH_LOCAL_FOLDER
         if menu.state == MENU_OPENMENU_COMPATIBLE:
             return _diagnostic(root, route_class, health, menu.state, True, True,
-                               "OpenMenu compatible detectado.", warnings, summary, menu)
+                               "OpenMenu compatible detectado.", warnings, summary, menu, reason_code='ready')
         if menu.state in {MENU_GDMENU_BASIC, MENU_OPENMENU_OLD}:
             return _diagnostic(root, route_class, health, menu.state, False, True,
                                "La estructura se puede leer, pero requiere migrar o actualizar OpenMenu antes de escribir.",
-                               warnings, summary, menu, legacy_menu_migratable=True)
+                               warnings, summary, menu, legacy_menu_migratable=True, reason_code='upgrade_required')
         return _diagnostic(root, route_class, health, menu.state, False, True,
                            "La estructura tiene slots, pero el menu no es compatible para escritura.",
-                           warnings, summary, menu, legacy_menu_migratable=(menu.state == MENU_UNKNOWN))
+                           warnings, summary, menu, legacy_menu_migratable=(menu.state == MENU_UNKNOWN), reason_code='menu_incompatible')
 
     if summary.is_root or len(relevant_entries) > 20:
         return _diagnostic(root, ROUTE_DANGEROUS, HEALTH_OK, MENU_UNKNOWN, False, False,
-                           "La ruta no esta vacia y no tiene estructura GDEMU/OpenMenu.", warnings, summary)
+                           "La ruta no esta vacia y no tiene estructura GDEMU/OpenMenu.", warnings, summary, reason_code='unrecognized')
 
     return _diagnostic(root, ROUTE_UNKNOWN, HEALTH_LOCAL_FOLDER, MENU_UNKNOWN, False, False,
-                       "La carpeta no esta vacia y no tiene estructura GDEMU/OpenMenu.", warnings, summary)
+                       "La carpeta no esta vacia y no tiene estructura GDEMU/OpenMenu.", warnings, summary, reason_code='unrecognized')
 
 
 def recommended_initial_storage_path(fallback: Path | None = None) -> Path:
@@ -215,7 +216,7 @@ def detect_menu(root: Path) -> MenuDiagnostic:
 def _diagnostic(root: Path, route_class: str, health: str, menu_state: str, write_allowed: bool,
                 scan_allowed: bool, reason: str, warnings: list[str], summary: RouteSummary,
                 menu: MenuDiagnostic | None = None, prepare_allowed: bool = False,
-                legacy_menu_migratable: bool = False) -> StorageDiagnostic:
+                legacy_menu_migratable: bool = False, reason_code: str = "unspecified") -> StorageDiagnostic:
     return StorageDiagnostic(
         root=root,
         route_class=route_class,
@@ -226,6 +227,7 @@ def _diagnostic(root: Path, route_class: str, health: str, menu_state: str, writ
         prepare_allowed=prepare_allowed,
         legacy_menu_migratable=legacy_menu_migratable,
         reason=reason,
+        reason_code=reason_code,
         warnings=warnings,
         summary=summary,
         menu=menu or MenuDiagnostic(menu_state, reason),

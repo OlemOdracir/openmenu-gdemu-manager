@@ -1,4 +1,5 @@
 from pathlib import Path
+from cdi_fixtures import classic_cdi
 import pytest
 from openmenu_gdemu_manager.core.models import GameItem
 from openmenu_gdemu_manager.dreamcast.image_integrity import validate_source,ImageIntegrityError
@@ -109,10 +110,10 @@ def test_readonly_search_never_writes_sd(worker_type,fail,tmp_path,monkeypatch):
 
 
 def test_cdi_basic_check_does_not_require_gdi_tracks(tmp_path):
-    cdi=tmp_path/'disc.cdi';cdi.write_bytes(b'placeholder for original CDI compatibility')
+    cdi=classic_cdi(tmp_path/'disc.cdi')
     validate_source(cdi)
     cdi.write_bytes(b'')
-    with pytest.raises(ImageIntegrityError,match='Empty CDI'):validate_source(cdi)
+    with pytest.raises(ImageIntegrityError):validate_source(cdi)
 
 
 def test_recovery_rejects_existing_damaged_staging_and_can_revert(tmp_path,monkeypatch):
@@ -256,3 +257,51 @@ def test_missing_state_evidence_requires_manual_recovery(tmp_path,payload):
     with pytest.raises(ValueError):service.complete_from_state()
     with pytest.raises(ValueError):service.revert_from_state()
     assert not (root/'02').exists()
+
+
+@pytest.mark.parametrize('version', [0x80000004, 0x80000005, 0x80000006])
+def test_cdi_transaction_accepts_complete_generated_image(tmp_path, version):
+    cdi = classic_cdi(tmp_path/'disc.cdi', version)
+    root = tmp_path/'sd'; root.mkdir()
+    config = root/'GDEMU.ini'; config.write_bytes(b'open_time = 150\r\n')
+    game = GameItem(2, 'CDI', source_path=str(cdi), pending_add=True)
+    service = SdSlotTransactionService(root, 'valid-cdi', source_validator=validate_source)
+    service.execute(service.build_plan([game]), [game])
+    validate_source(root/'02')
+    assert (root/'02'/'disc.cdi').read_bytes() == cdi.read_bytes()
+    assert config.read_bytes() == b'open_time = 150\r\n'
+
+
+def test_truncated_cdi_preflight_preserves_menu_and_existing_slots(tmp_path):
+    cdi = classic_cdi(tmp_path/'disc.cdi', payload_cut=2048)
+    root = tmp_path/'sd'; slot = root/'02'; slot.mkdir(parents=True)
+    (slot/'keep.txt').write_bytes(b'keep')
+    menu = root/'01'; menu.mkdir(); (menu/'menu.bin').write_bytes(b'old-menu')
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+    games = [GameItem(2, 'Old', folder=slot, pending_delete=True), GameItem(3, 'Bad CDI', source_path=str(cdi), pending_add=True)]
+    service = SdSlotTransactionService(root, 'invalid-cdi', source_validator=validate_source)
+    with pytest.raises(ImageIntegrityError): service.execute(service.build_plan(games), games)
+    assert {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()} == before
+    assert not service.transaction_dir.exists()
+
+
+def test_cdi_equal_byte_copy_damage_remains_recoverable(tmp_path, monkeypatch):
+    from openmenu_gdemu_manager.services import sd_slot_transaction as module
+    original = module.copy_game_source
+    cdi = classic_cdi(tmp_path/'disc.cdi')
+    root = tmp_path/'sd'; root.mkdir()
+    game = GameItem(2, 'CDI', source_path=str(cdi), pending_add=True)
+    def damaged(src, dst):
+        original(src, dst)
+        path = dst/'disc.cdi'; data = bytearray(path.read_bytes())
+        # Same byte count, impossible descriptor position: old total-size check passes.
+        data[-4:] = bytes(4); path.write_bytes(data)
+    monkeypatch.setattr(module, 'copy_game_source', damaged)
+    service = SdSlotTransactionService(root, 'damaged-cdi', source_validator=validate_source)
+    with pytest.raises(ImageIntegrityError): service.execute(service.build_plan([game]), [game])
+    assert not (root/'02').exists() and service._read_state()['stage'] == 'failed'
+    recovery = SdSlotTransactionService(root, 'damaged-cdi')
+    with pytest.raises(ImageIntegrityError): recovery.complete_from_state()
+    assert not (root/'02').exists()
+    recovery.revert_from_state()
+    assert recovery._read_state()['stage'] == 'reverted'

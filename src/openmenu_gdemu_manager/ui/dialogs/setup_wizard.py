@@ -671,7 +671,7 @@ def _diagnostic_message(diagnostic: StorageDiagnostic) -> str:
 
 _REASON_KEYS = {
     "La ruta no existe o no es accesible.": "dialog.setup.reason.not_accessible",
-    "La ruta presenta seÃ±ales de corrupcion. La app no intentara reparar ni escribir.": (
+    "La ruta presenta señales de corrupcion. La app no intentara reparar ni escribir.": (
         "dialog.setup.reason.possible_corruption"
     ),
     "La ruta presenta senales de corrupcion. La app no intentara reparar ni escribir.": (

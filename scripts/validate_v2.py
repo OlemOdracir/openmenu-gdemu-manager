@@ -8,7 +8,7 @@ DOC=ROOT/'docs/V2_VALIDATION.md'
 
 
 def source_digest():
-    paths=list((ROOT/'src').rglob('*.py'))+list((ROOT/'src').rglob('*.json'))+list((ROOT/'src').rglob('*.svg'))+list((ROOT/'tests').glob('test_*.py'))+list((ROOT/'openmenu_gdemu_manager').glob('*.py'))+[ROOT/'pyproject.toml',Path(__file__)]
+    paths=list((ROOT/'src').rglob('*.py'))+list((ROOT/'src').rglob('*.json'))+list((ROOT/'src').rglob('*.svg'))+list((ROOT/'tests').rglob('*.py'))+list((ROOT/'openmenu_gdemu_manager').glob('*.py'))+[ROOT/'pyproject.toml',Path(__file__)]
     digest=hashlib.sha256()
     for path in sorted(paths):
         digest.update(path.relative_to(ROOT).as_posix().encode());digest.update(path.read_bytes().replace(b'\r\n',b'\n'))
@@ -37,7 +37,7 @@ def main():
         xml=target/f'tests-{platform}-{scale}.xml'
         xml.unlink(missing_ok=True)
         tests=[] if platform=='offscreen' and scale=='1' else ['tests/test_v2_workflows.py','tests/test_v2_dialogs.py']
-        run=subprocess.run([sys.executable,'-m','pytest',*tests,'-q','--disable-warnings',f'--junitxml={xml}'],cwd=ROOT,env=environment)
+        run=subprocess.run([sys.executable,'-m','pytest',*tests,'-q','--disable-warnings',f'--junitxml={xml}',f'--basetemp={target / ("tmp-"+platform+"-"+scale)}'],cwd=ROOT,env=environment)
         if not xml.exists():return run.returncode or 1
         suites=ET.parse(xml).getroot().findall('testsuite')
         counts={key:sum(int(s.get(key,0)) for s in suites) for key in ('tests','failures','errors','skipped')}
@@ -53,7 +53,7 @@ def main():
         '', 'Design coverage: compact setup (choose/empty/blocked/read-only/ready/installed and expanded details, read-only GDEMU.ini findings in both languages, bounded rendering and stale-destination invalidation); backup; upgrade; save review with all five counts; providers and credentials; first-run language; About; bulk progress; standard messages and template inputs. Every exported original dialog has an explicit adapted/replaced disposition. Scrollable provider cells and fixed footers have separate reachability checks.',
         '', 'Rendered screenshots are generated in `build/v2-validation/visual-<backend>-<scale>/`. Automated reachability and snapshots do not substitute for human visual review; its findings and scope are recorded in `docs/V2_DIALOG_DESIGN_AUDIT.md`.',
         '', 'Portable startup is checked separately with `OpenMenuGDEMUManager.exe --self-test report.json`. It must report v2 startup/icons with no errors and without SD scanning or network requests.',
-        '', '**Release gates still pending:** clean Windows VM; private/credentialed provider checks; CDI internal descriptor/track-bound validation; Dreamcast/GDEMU launch of imported GDI/CDI games. Existing v1 hardware reports do not certify this v2 build.','']
+        '', '**Release gates still pending:** clean Windows VM; private/credentialed provider checks; real-world unsupported CDI layouts/deeper image checks; Dreamcast/GDEMU launch of imported GDI/CDI games. Existing v1 hardware reports do not certify this v2 build.','']
     DOC.write_text('\n'.join(lines),encoding='utf-8')
     return 0 if success else 1
 

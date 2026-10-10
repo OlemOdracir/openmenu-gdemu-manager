@@ -90,3 +90,14 @@ regression test, including configuration and optional provider tests.
 Independent review caught stale destination context and excessive RichText rows
 from a bounded but repetitive file. Both gained reproductions and corrections;
 final reviewer disposition is recorded in V2_INDEPENDENT_AUDIT.md.
+
+
+## CDI import follow-up
+
+CDI import still uses the existing V2 file/folder picker and selection table.
+Supported structural checks now show a localized checked status and scope
+in the status tooltip. Confirmed failures and unsupported layouts remain
+unselectable with distinct localized explanations. Native captures and
+regressions exercise checked/invalid/unsupported in EN/ES through InspectWorker;
+no preview, pagination or action layout is replaced. The CLI/MCP architecture
+is separate from these desktop screens.

@@ -57,7 +57,7 @@ class ImportGamesDialog(QDialog):
         self.table.verticalHeader().hide();self.table.verticalHeader().setDefaultSectionSize(68)
         self.table.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
-        self.table.setColumnWidth(0,38);self.table.setColumnWidth(3,60);self.table.setColumnWidth(4,190)
+        self.table.setColumnWidth(0,38);self.table.setColumnWidth(3,90);self.table.setColumnWidth(4,190)
         self.table.cellClicked.connect(self.row_clicked);root.addWidget(self.table,1)
         self.feedback=label(tr('choose_source'),muted=True,wrap=True);root.addWidget(self.feedback)
         root.addWidget(label(tr('prepare_real_hint'),muted=True,wrap=True))
@@ -110,9 +110,9 @@ class ImportGamesDialog(QDialog):
         for row,entry in enumerate(self.entries):
             check=SelectionCheck(name=entry.name);check.setChecked(self.checked[row]);check.setEnabled(not self.errors[row]);check.clicked.connect(lambda value,r=row:self.toggle(r,value))
             self.table.setCellWidget(row,0,check)
-            status=tr('verify_source') if self.errors[row] else tr('possible_duplicate') if entry.existing_match else tr('source_cdi_limited') if entry.media_type=='CDI' else tr('source_valid')
+            status=tr('verify_source') if self.errors[row] else tr('possible_duplicate') if entry.existing_match else tr('source_cdi_checked') if entry.media_type=='CDI' else tr('source_valid')
             for col,value in ((1,entry.name),(2,entry.source_path),(3,entry.media_type),(4,status)):
-                item=QTableWidgetItem(value);item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable);item.setToolTip(self.errors[row] or value);self.table.setItem(row,col,item)
+                item=QTableWidgetItem(value);item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable);item.setToolTip(self.errors[row] or (tr('source_cdi_scope') if entry.media_type=='CDI' and col==4 else value));self.table.setItem(row,col,item)
         self.sync()
 
     def toggle(self,row,value):self.checked[row]=bool(value);self.sync()

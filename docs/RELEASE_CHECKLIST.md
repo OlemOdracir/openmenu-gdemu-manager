@@ -37,6 +37,10 @@ The script validates:
 - portable `data/` folder creation;
 - SHA256 file generation.
 
+For V2 clean-Windows and hardware acceptance, follow
+[the external acceptance protocol](V2_EXTERNAL_ACCEPTANCE.md) and record actual
+results separately from local tests.
+
 ## Manual checks
 
 - Download the ZIP from GitHub Releases, not from local `dist/`.

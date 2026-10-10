@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmenu-gdemu-manager"
-version = "2.0.0.dev4"
+version = "2.0.0.dev5"
 description = "Local Windows manager for Dreamcast OpenMenu/GDEMU games and covers."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,9 @@ dependencies = [
   "numpy>=1.26",
   "certifi>=2024.0",
 ]
+
+[project.scripts]
+openmenu-gdemu-agent = "openmenu_gdemu_manager.cli:main"
 
 [project.gui-scripts]
 openmenu-gdemu-manager = "openmenu_gdemu_manager.__main__:main"
