@@ -167,7 +167,7 @@ class BulkSelectionHeader(QHeaderView):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, initial_root: Path | None = None):
         super().__init__()
         migrate_legacy_runtime_data()
         self.settings = load_settings()
@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(app_qicon())
         self.resize(1280, 780)
         self.state = load_state(STATE_PATH)
-        self.root_path = recommended_initial_storage_path(Path.cwd())
+        self.root_path = Path(initial_root) if initial_root is not None else recommended_initial_storage_path(Path.cwd())
         self.games: list[GameItem] = []
         self.filtered_games: list[GameItem] = []
         self.scan_thread: QThread | None = None
@@ -394,11 +394,15 @@ class MainWindow(QMainWindow):
         self._update_save_button_state()
 
     def _populate_status_filter(self):
+        selected = self.status_filter.currentData()
+        self.status_filter.blockSignals(True)
         self.status_filter.clear()
         for status in STATUS_OPTIONS:
             icon = action_qicon("bulk_mode", "default", 22) if status == "todos" else status_qicon(status, 22)
             label = tr("filter.all") if status == "todos" else translate_status(status)
             self.status_filter.addItem(icon, label, status)
+        self.status_filter.setCurrentIndex(max(0, self.status_filter.findData(selected)))
+        self.status_filter.blockSignals(False)
 
     def eventFilter(self, watched, event):
         if getattr(self, "table", None) is not None and watched is self.table.viewport():
@@ -536,7 +540,7 @@ class MainWindow(QMainWindow):
     def reload_languages(self):
         refresh_languages(configured_languages_dir(self.settings))
         set_language(self.settings.get("ui", {}).get("language", "en"))
-        self.rebuild_language_menu()
+        self.retranslate_ui()
         self.status.setText(tr("language.reloaded"))
 
     def open_languages_folder(self):
@@ -548,7 +552,23 @@ class MainWindow(QMainWindow):
         self.menuBar().clear()
         self._populate_status_filter()
         self.text_filter.setPlaceholderText(tr("filter.placeholder"))
-        self.save_changes_button.setToolTip(tr("toolbar.save_tooltip"))
+        for button, tooltip_key, label_key in (
+            (self.browse_button, "toolbar.path_tooltip", "action.route"),
+            (self.scan_button, "toolbar.scan_tooltip", "action.scan"),
+            (self.add_game_button, "toolbar.add_tooltip", "action.add"),
+            (self.bulk_mode_button, "filter.bulk_tooltip", "action.bulk"),
+            (self.bulk_button, "filter.bulk_search_tooltip", "action.propose"),
+            (self.save_bulk_button, "filter.save_bulk_tooltip", "action.save"),
+        ):
+            tooltip = tr(tooltip_key)
+            button.setToolTip(tooltip)
+            button.setAccessibleName(tooltip)
+            if not button.property("iconOnly"):
+                button.setText(tr(label_key))
+        saveable = self._valid_bulk_proposal_count()
+        if saveable:
+            self.save_bulk_button.setToolTip(tr("bulk.save_ready_tooltip", count=saveable))
+            self.save_bulk_button.setAccessibleName(self.save_bulk_button.toolTip())
         self._update_save_button_state()
         self.games_model.headerDataChanged.emit(Qt.Orientation.Horizontal, 0, self.games_model.columnCount() - 1)
         self.file_menu = self.menuBar().addMenu(tr("menu.file"))
@@ -796,7 +816,10 @@ class MainWindow(QMainWindow):
         complete = None
         revert = None
         if can_auto_recover:
-            complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+            if service.can_complete_recovery():
+                complete = message.addButton(tr("slot_recovery.complete"), QMessageBox.ButtonRole.AcceptRole)
+            else:
+                message.setInformativeText(tr("slot_recovery.revert_in_progress"))
             revert = message.addButton(tr("slot_recovery.revert"), QMessageBox.ButtonRole.DestructiveRole)
         open_folder = message.addButton(tr("slot_recovery.open_folder"), QMessageBox.ButtonRole.ActionRole)
         later = message.addButton(tr("slot_recovery.later"), QMessageBox.ButtonRole.RejectRole)
@@ -1239,6 +1262,7 @@ class MainWindow(QMainWindow):
             if count
             else tr("toolbar.save_tooltip")
         )
+        self.save_changes_button.setAccessibleName(self.save_changes_button.toolTip())
         self.save_changes_button.setProperty("attention", "true" if has_changes else "false")
         if not has_changes:
             self.save_changes_button.setProperty("pulse", "false")
@@ -1915,7 +1939,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, APP_NAME, tr("error.generic", message=exc))
 
 
-def run():
+def run(window_class=MainWindow):
     try:
         log.info("Starting UI")
         _set_windows_app_id()
@@ -1925,6 +1949,9 @@ def run():
         refresh_languages(configured_languages_dir(settings))
         if not bool(settings.get("ui", {}).get("language_prompted", False)):
             apply_template(app, configured_active_template(settings))
+            if getattr(window_class, 'uses_v2_design', False):
+                from .v2.design import apply_theme
+                apply_theme(app)
             dialog = LanguageSelectionDialog(available_languages())
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 language = dialog.selected_code
@@ -1937,7 +1964,7 @@ def run():
         set_language(settings.get("ui", {}).get("language", "en"))
         refresh_templates(configured_template_dir(settings))
         apply_template(app, configured_active_template(settings))
-        window = MainWindow()
+        window = window_class()
         _place_main_window(window)
         window.show()
         QTimer.singleShot(0, lambda: window.safe_call(window.start_scan))

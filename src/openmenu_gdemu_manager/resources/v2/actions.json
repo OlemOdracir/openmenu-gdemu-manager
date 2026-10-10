@@ -1,0 +1,451 @@
+{
+  "browse": {
+    "icon": "folder-open",
+    "label": {
+      "es": "Seleccionar SD",
+      "en": "Select SD"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "browse",
+    "qtExtension": false
+  },
+  "scan": {
+    "icon": "refresh",
+    "label": {
+      "es": "Actualizar",
+      "en": "Refresh"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "scan",
+    "qtExtension": false
+  },
+  "add": {
+    "icon": "plus",
+    "label": {
+      "es": "Añadir juegos",
+      "en": "Add games"
+    },
+    "role": "primary",
+    "writes": true,
+    "qtAction": "add",
+    "qtExtension": false
+  },
+  "save": {
+    "icon": "device-floppy",
+    "label": {
+      "es": "Revisar y guardar",
+      "en": "Review and save"
+    },
+    "role": "primary",
+    "writes": true,
+    "qtAction": "save",
+    "qtExtension": false
+  },
+  "search": {
+    "icon": "search",
+    "label": {
+      "es": "Buscar",
+      "en": "Search"
+    },
+    "role": "primary",
+    "writes": false,
+    "qtAction": "search",
+    "qtExtension": false
+  },
+  "bulk_mode": {
+    "icon": "list",
+    "label": {
+      "es": "Carátulas",
+      "en": "Covers"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "bulk_mode",
+    "qtExtension": false
+  },
+  "bulk_search": {
+    "icon": "search",
+    "label": {
+      "es": "Buscar selección",
+      "en": "Search selection"
+    },
+    "role": "primary",
+    "writes": false,
+    "qtAction": "bulk_search",
+    "qtExtension": false
+  },
+  "rename": {
+    "icon": "device-floppy",
+    "label": {
+      "es": "Guardar nombre",
+      "en": "Save name"
+    },
+    "role": "secondary",
+    "writes": true,
+    "qtAction": "rename",
+    "qtExtension": false
+  },
+  "undo_name": {
+    "icon": "refresh",
+    "label": {
+      "es": "Deshacer nombre",
+      "en": "Undo name"
+    },
+    "role": "secondary",
+    "writes": true,
+    "qtAction": "rename",
+    "qtExtension": false
+  },
+  "local_file": {
+    "icon": "file",
+    "label": {
+      "es": "Imágenes locales",
+      "en": "Local images"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "local_file",
+    "qtExtension": false
+  },
+  "web": {
+    "icon": "world",
+    "label": {
+      "es": "Web",
+      "en": "Web"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "web",
+    "qtExtension": false
+  },
+  "select": {
+    "icon": "circle-check",
+    "label": {
+      "es": "Elegir",
+      "en": "Choose"
+    },
+    "role": "primary",
+    "writes": true,
+    "qtAction": "select",
+    "qtExtension": false
+  },
+  "keep": {
+    "icon": "circle-check",
+    "label": {
+      "es": "Conservar",
+      "en": "Keep current"
+    },
+    "role": "secondary",
+    "writes": true,
+    "qtAction": "select",
+    "qtExtension": false
+  },
+  "discard": {
+    "icon": "trash",
+    "label": {
+      "es": "Descartar elección",
+      "en": "Discard choice"
+    },
+    "role": "secondary",
+    "writes": true,
+    "qtAction": "discard",
+    "qtExtension": false
+  },
+  "remove": {
+    "icon": "trash",
+    "label": {
+      "es": "Retirar juego",
+      "en": "Remove game"
+    },
+    "role": "danger",
+    "writes": true,
+    "qtAction": "discard",
+    "qtExtension": false
+  },
+  "inspect": {
+    "icon": "zoom-in",
+    "label": {
+      "es": "Ampliar",
+      "en": "Enlarge"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "compare": {
+    "icon": "cards",
+    "label": {
+      "es": "Comparar",
+      "en": "Compare"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "clear_pair": {
+    "icon": "cards",
+    "label": {
+      "es": "Elegir otras finalistas",
+      "en": "Choose other finalists"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "back": {
+    "icon": "arrow-left",
+    "label": {
+      "es": "Volver",
+      "en": "Back"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "close": {
+    "icon": "x",
+    "label": {
+      "es": "Cerrar",
+      "en": "Close"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "close",
+    "qtExtension": false
+  },
+  "cancel": {
+    "icon": "x",
+    "label": {
+      "es": "Cancelar",
+      "en": "Cancel"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "close",
+    "qtExtension": false
+  },
+  "info": {
+    "icon": "info-circle",
+    "label": {
+      "es": "Datos del juego",
+      "en": "Game information"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "image_info": {
+    "icon": "info-circle",
+    "label": {
+      "es": "Datos de la imagen",
+      "en": "Image information"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "help": {
+    "icon": "info-circle",
+    "label": {
+      "es": "Ayuda",
+      "en": "Help"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "settings": {
+    "icon": "settings",
+    "label": {
+      "es": "Configuración",
+      "en": "Settings"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "install_template": {
+    "icon": "folder-open",
+    "label": {
+      "es": "Instalar OpenMenu",
+      "en": "Install OpenMenu"
+    },
+    "role": "primary",
+    "writes": true,
+    "qtAction": "install_template",
+    "qtExtension": false
+  },
+  "fit": {
+    "icon": "fit",
+    "label": {
+      "es": "Ajustar",
+      "en": "Fit"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "zoom_in": {
+    "icon": "zoom-in",
+    "label": {
+      "es": "Acercar",
+      "en": "Zoom in"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "zoom_out": {
+    "icon": "zoom-out",
+    "label": {
+      "es": "Alejar",
+      "en": "Zoom out"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "actual_size": {
+    "icon": "photo",
+    "label": {
+      "es": "100 %",
+      "en": "100 %"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "image_source": {
+    "icon": "photo",
+    "label": {
+      "es": "Imagen disponible",
+      "en": "Available image"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "normalized": {
+    "icon": "device-gamepad",
+    "label": {
+      "es": "OpenMenu · 256 px",
+      "en": "OpenMenu · 256 px"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "side": {
+    "icon": "cards",
+    "label": {
+      "es": "Lado a lado",
+      "en": "Side by side"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "alternate": {
+    "icon": "refresh",
+    "label": {
+      "es": "Alternar A/B",
+      "en": "Alternate A/B"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "retry": {
+    "icon": "refresh",
+    "label": {
+      "es": "Reintentar",
+      "en": "Retry"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": "scan",
+    "qtExtension": false
+  },
+  "next": {
+    "icon": "arrow-right",
+    "label": {
+      "es": "Siguiente",
+      "en": "Next"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "previous": {
+    "icon": "arrow-left",
+    "label": {
+      "es": "Anterior",
+      "en": "Previous"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "theme": {
+    "icon": "theme",
+    "label": {
+      "es": "Cambiar tema",
+      "en": "Change theme"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  },
+  "query_clear": {
+    "icon": "x",
+    "label": {"es": "Vaciar búsqueda", "en": "Clear search"},
+    "role": "secondary", "writes": false, "qtAction": null, "qtExtension": true
+  },
+  "game_files": {
+    "icon": "file",
+    "label": {"es": "Elegir archivo de juego", "en": "Choose game file"},
+    "role": "secondary", "writes": false, "qtAction": "local_file", "qtExtension": false
+  },
+  "game_folder": {
+    "icon": "folder-open",
+    "label": {"es": "Elegir carpeta", "en": "Choose folder"},
+    "role": "secondary", "writes": false, "qtAction": "browse", "qtExtension": false
+  },
+  "game_source_remove": {
+    "icon": "x",
+    "label": {"es": "Quitar de esta lista", "en": "Remove from this list"},
+    "role": "secondary", "writes": false, "qtAction": "discard", "qtExtension": false
+  },
+  "missing": {
+    "icon": "photo",
+    "label": {
+      "es": "Sin carátula",
+      "en": "Missing cover"
+    },
+    "role": "secondary",
+    "writes": false,
+    "qtAction": null,
+    "qtExtension": true
+  }
+}

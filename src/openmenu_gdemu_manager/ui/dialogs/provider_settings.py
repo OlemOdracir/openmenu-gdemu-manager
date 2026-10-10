@@ -193,23 +193,23 @@ class ProviderSettingsDialog(QDialog):
 class ProviderConfigDialog(QDialog):
     FIELD_MAP = {
         "screenscraper": [
-            ("enabled", "Activo", "bool"),
-            ("ssid", "Usuario ScreenScraper", "text"),
-            ("sspassword", "Password ScreenScraper", "password"),
-            ("timeout", "Timeout", "int"),
-            ("priority", "Prioridad", "int"),
-            ("min_auto_score", "Score auto", "int"),
-            ("min_review_score", "Score revision", "int"),
+            ("enabled", "dialog.provider.field.enabled", "bool"),
+            ("ssid", "dialog.provider.field.ssid", "text"),
+            ("sspassword", "dialog.provider.field.sspassword", "password"),
+            ("timeout", "dialog.provider.field.timeout", "int"),
+            ("priority", "dialog.provider.field.priority", "int"),
+            ("min_auto_score", "dialog.provider.field.min_auto_score", "int"),
+            ("min_review_score", "dialog.provider.field.min_review_score", "int"),
         ],
         "default": [
-            ("enabled", "Activo", "bool"),
-            ("base_url", "Base URL", "text"),
-            ("api_key", "API key", "password"),
-            ("client_id", "Client ID", "text"),
-            ("client_secret", "Client secret", "password"),
-            ("priority", "Prioridad", "int"),
-            ("min_auto_score", "Score auto", "int"),
-            ("min_review_score", "Score revision", "int"),
+            ("enabled", "dialog.provider.field.enabled", "bool"),
+            ("base_url", "dialog.provider.field.base_url", "text"),
+            ("api_key", "dialog.provider.field.api_key", "password"),
+            ("client_id", "dialog.provider.field.client_id", "text"),
+            ("client_secret", "dialog.provider.field.client_secret", "password"),
+            ("priority", "dialog.provider.field.priority", "int"),
+            ("min_auto_score", "dialog.provider.field.min_auto_score", "int"),
+            ("min_review_score", "dialog.provider.field.min_review_score", "int"),
         ],
     }
 
@@ -226,7 +226,7 @@ class ProviderConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         fields = self.FIELD_MAP.get(self.provider_id, self.FIELD_MAP["default"])
-        for key, label, kind in fields:
+        for key, label_key, kind in fields:
             if key not in self.cfg and kind != "bool":
                 continue
             if kind == "bool":
@@ -242,7 +242,7 @@ class ProviderConfigDialog(QDialog):
                 if kind == "password":
                     widget.setEchoMode(QLineEdit.EchoMode.Password)
             self.inputs[key] = widget
-            form.addRow(label, widget)
+            form.addRow(tr(label_key), widget)
         layout.addLayout(form)
         buttons = QDialogButtonBox()
         save_button = buttons.addButton(tr("action.save"), QDialogButtonBox.ButtonRole.AcceptRole)

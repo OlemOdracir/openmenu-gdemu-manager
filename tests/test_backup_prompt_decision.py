@@ -85,6 +85,7 @@ def test_backup_prompt_finished_writes_local_decision_and_sd_registry(tmp_path, 
         diagnostic=diagnostic,
         settings={"ui": {"backup_decisions": {}}},
         _set_busy=lambda *_args: None,
+        status=SimpleNamespace(setText=lambda _text: None),
         accept=lambda: None,
     )
     monkeypatch.setattr(backup_prompt, "save_settings", lambda settings: saved.update(settings))

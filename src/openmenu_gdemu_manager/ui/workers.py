@@ -28,7 +28,7 @@ from ..services.game_service import build_pending_game, next_free_slot
 from ..services.legacy_menu_upgrade import LegacyMenuUpgradeService
 from ..services.openmenu_rebuilder import OpenMenuRebuilder
 from ..services.search_log import append_search_event_for_game, summarize_candidates
-from ..services.sd_slot_transaction import SdSlotTransactionService
+from ..services.sd_slot_transaction import SdSlotTransactionService, ensure_no_incomplete_transactions
 from ..services.transaction_log import append_transaction, new_operation_id
 
 log = logging.getLogger(__name__)
@@ -326,10 +326,11 @@ class SearchWorker(QObject):
     finished = Signal(object)
     error = Signal(str)
 
-    def __init__(self, game: GameItem, query: str):
+    def __init__(self, game: GameItem, query: str, write_allowed: bool = True):
         super().__init__()
         self.game = game
         self.query = query
+        self.write_allowed = write_allowed
 
     def run(self):
         try:
@@ -352,7 +353,7 @@ class SearchWorker(QObject):
                         "saved_count": len(previous),
                         "results": summarize_candidates(candidates),
                     },
-                )
+                ) if self.write_allowed else None
                 if search_log_path is not None:
                     log.info("SD search log updated: %s", search_log_path)
             except Exception:
@@ -365,7 +366,7 @@ class SearchWorker(QObject):
         except Exception as exc:
             log.exception("SearchWorker failed")
             try:
-                append_search_event_for_game(
+                if self.write_allowed: append_search_event_for_game(
                     self.game,
                     {
                         "event": "candidate_search_error",
@@ -461,10 +462,11 @@ class BulkWorker(QObject):
     finished = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, games: list[GameItem]):
+    def __init__(self, games: list[GameItem], write_allowed: bool = True):
         super().__init__()
         self.games = games
         self.cancelled = False
+        self.write_allowed = write_allowed
 
     def cancel(self):
         self.cancelled = True
@@ -492,7 +494,7 @@ class BulkWorker(QObject):
                 try:
                     candidates = find_candidates(game, game.name, include_remote=True)
                     try:
-                        append_search_event_for_game(
+                        if self.write_allowed: append_search_event_for_game(
                             game,
                             {
                                 "event": "bulk_candidate_search",
@@ -534,7 +536,7 @@ class BulkWorker(QObject):
                 except Exception as exc:
                     log.exception("Bulk game failed: slot=%03d", game.slot)
                     try:
-                        append_search_event_for_game(
+                        if self.write_allowed: append_search_event_for_game(
                             game,
                             {
                                 "event": "bulk_candidate_search_error",
@@ -557,19 +559,30 @@ class SaveChangesWorker(QObject):
     finished = Signal(str)
     error = Signal(str)
 
-    def __init__(self, root_path: Path, games: list[GameItem], state: dict, write_allowed: bool = True):
+    def __init__(self, root_path: Path, games: list[GameItem], state: dict, write_allowed: bool = True, validate_images: bool = False):
         super().__init__()
         self.root_path = Path(root_path)
         self.games = games
         self.state = state
         self.write_allowed = write_allowed
+        self.validate_images = validate_images
 
     def run(self):
         operation_id = new_operation_id()
         transaction_summary: dict | None = None
+        preflight_completed = False
         try:
             if not self.write_allowed:
                 raise PermissionError("La ruta actual esta en modo solo lectura; no se aplicaran cambios.")
+            ensure_no_incomplete_transactions(self.root_path)
+            source_validator = None
+            if self.validate_images:
+                from ..dreamcast.image_integrity import validate_source
+                source_validator = validate_source
+                for game in self.games:
+                    if game.pending_add and not game.pending_delete:
+                        validate_source(game.source_path)
+            preflight_completed = True
             before_metadata = parse_openmenu_from_track(find_openmenu_track(self.root_path))
             deletions = [game for game in self.games if game.pending_delete and game.folder]
             additions = [game for game in self.games if game.pending_add and game.source_path]
@@ -594,7 +607,7 @@ class SaveChangesWorker(QObject):
                 if game.save_status == "pendiente_guardar"
                 and before_metadata.get(game.slot, {}).get("product", "") not in {"", game.product_id}
             ]
-            slot_service = SdSlotTransactionService(self.root_path, operation_id)
+            slot_service = SdSlotTransactionService(self.root_path, operation_id, source_validator=source_validator)
             slot_plan = slot_service.build_plan(self.games)
             slot_moves = [
                 {
@@ -686,7 +699,7 @@ class SaveChangesWorker(QObject):
         except Exception as exc:
             log.exception("SaveChangesWorker failed")
             try:
-                append_transaction(
+                if self.write_allowed and preflight_completed: append_transaction(
                     self.root_path,
                     {
                         "operation_id": operation_id,

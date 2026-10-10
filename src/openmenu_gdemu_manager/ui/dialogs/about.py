@@ -12,10 +12,8 @@ from ..icons import app_logo_pixmap
 
 
 def app_version() -> str:
-    try:
-        return metadata.version("openmenu-gdemu-manager")
-    except metadata.PackageNotFoundError:
-        return __version__
+    # Editable v1 metadata may coexist with a v2 source/portable build.
+    return __version__
 
 
 class AboutDialog(QDialog):

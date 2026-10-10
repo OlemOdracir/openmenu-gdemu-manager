@@ -11,6 +11,7 @@ from ..core.models import GameItem
 from ..dreamcast.metadata import is_synthetic_slot_serial, read_disc_product_id
 from ..dreamcast.sd_writer import copy_game_source, source_size, write_name_txt
 from .sd_registry import registry_dir
+from ..i18n import tr
 
 
 ProgressCallback = Callable[[int, int, str, str], None]
@@ -75,8 +76,9 @@ class SlotTransactionResult:
 
 
 class SdSlotTransactionService:
-    def __init__(self, root_path: Path, operation_id: str):
+    def __init__(self, root_path: Path, operation_id: str, source_validator=None):
         self.root_path = Path(root_path)
+        self.source_validator = source_validator
         self.operation_id = operation_id
         self.transaction_dir = registry_dir(self.root_path) / "slot_transactions" / operation_id
         self.temp_dir = self.transaction_dir / "temp"
@@ -120,11 +122,16 @@ class SdSlotTransactionService:
 
     def can_auto_recover(self) -> bool:
         try:
-            self._read_plan()
+            self._validate_plan_paths(self._read_plan())
             self._read_state_strict()
             return True
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
             return False
+
+    def can_complete_recovery(self) -> bool:
+        if not self.can_auto_recover():return False
+        state=self._read_state_strict()
+        return not state.get('rollback') and state.get('stage')!='recovering_revert'
 
     def execute(
         self,
@@ -133,6 +140,10 @@ class SdSlotTransactionService:
         progress: ProgressCallback | None = None,
     ) -> SlotTransactionResult:
         self._validate_plan_paths(plan)
+        ensure_no_incomplete_transactions(self.root_path)
+        if self.source_validator:
+            for entry in plan.additions:
+                self.source_validator(Path(entry.source_path))
         self.transaction_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.add_dir.mkdir(parents=True, exist_ok=True)
@@ -144,6 +155,7 @@ class SdSlotTransactionService:
         deleted: list[dict[str, Any]] = []
         added: list[dict[str, Any]] = []
         product_updates: list[dict[str, Any]] = []
+        created_slots: list[int] = []
         game_by_old_slot = {game.slot: game for game in games}
 
         total_steps = max(1, len(plan.deletions) + len(plan.moves) + len(plan.additions) + 1)
@@ -184,9 +196,9 @@ class SdSlotTransactionService:
                     shutil.rmtree(temp)
                 copy_game_source(source_path, temp)
                 self._verify_copied_source(source_path, temp)
+                if self.source_validator:self.source_validator(temp)
             self._write_state("added_to_temp", deleted=deleted, temp_slots=sorted(temp_by_old_slot))
 
-            created_slots: list[int] = []
             for entry in plan.moves:
                 game = game_by_old_slot[int(entry.old_slot)]
                 temp = temp_by_old_slot[int(entry.old_slot)]
@@ -194,8 +206,10 @@ class SdSlotTransactionService:
                 if target.exists():
                     raise FileExistsError(f"El slot destino ya existe: {target}")
                 temp.rename(target)
-                update = self._apply_final_slot(game, int(entry.new_slot), target)
                 moved.append(entry.to_dict())
+                self._write_state("publishing", deleted=deleted, moved=moved,
+                                  added=added, created_slots=sorted(created_slots))
+                update = self._apply_final_slot(game, int(entry.new_slot), target)
                 if update:
                     product_updates.append(update)
 
@@ -206,12 +220,14 @@ class SdSlotTransactionService:
                 if target.exists():
                     raise FileExistsError(f"El slot destino ya existe: {target}")
                 temp.rename(target)
+                added.append(entry.to_dict())
+                created_slots.append(int(entry.new_slot))
+                self._write_state("publishing", deleted=deleted, moved=moved,
+                                  added=added, created_slots=sorted(created_slots))
                 update = self._apply_final_slot(game, int(entry.new_slot), target)
                 game.pending_add = False
                 game.is_new = False
                 game.has_placeholder_cover = game.has_placeholder_cover and Path(game.current_cover or "").exists()
-                added.append(entry.to_dict())
-                created_slots.append(int(entry.new_slot))
                 if update:
                     product_updates.append(update)
 
@@ -244,14 +260,36 @@ class SdSlotTransactionService:
                 product_updates=product_updates,
             )
         except Exception as exc:
-            self._write_state("failed", error=str(exc), deleted=deleted, moved=moved, added=added)
+            self._write_state("failed", error=str(exc), deleted=deleted, moved=moved,
+                              added=added, created_slots=sorted(created_slots))
             raise
 
     def complete_from_state(self) -> None:
         self._validate_path_containment()
         plan = self._read_plan()
         self._validate_plan_paths(plan)
-        self._write_state("recovering_complete")
+        state = self._read_state_strict()
+        if state.get('rollback') or state.get('stage')=='recovering_revert':
+            raise RuntimeError(tr('slot_recovery.revert_in_progress'))
+        created_slots = {int(value) for value in state.get("created_slots", [])}
+        moved = list(state.get("moved", []))
+        moved_slots = {int(entry["old_slot"]) for entry in moved}
+        # Recovery must apply the same integrity gate even when the original
+        # UI reconstructed this service without an injected validator.
+        from ..dreamcast.image_integrity import validate_source
+        validator = self.source_validator or validate_source
+        for entry in plan.additions:
+            source = Path(entry.source_path)
+            temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
+            target = self._slot_folder(int(entry.new_slot))
+            validator(source)
+            if temp.exists():
+                self._verify_copied_source(source, temp)
+                validator(temp)
+            elif target.exists() and int(entry.new_slot) in created_slots:
+                self._verify_copied_source(source, target)
+                validator(target)
+        self._write_state("recovering_complete", created_slots=sorted(created_slots), moved=moved)
         for entry in plan.deletions:
             source = self._path_in_root(Path(entry.folder), "folder origen")
             target = self._path_in_root(self.trash_dir / f"{entry.old_slot:02d}", "papelera interna")
@@ -259,6 +297,7 @@ class SdSlotTransactionService:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source.rename(target)
         for entry in plan.moves:
+            if int(entry.old_slot) in moved_slots:continue
             original = self._path_in_root(Path(entry.folder), "folder origen")
             temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
             if original.exists() and not temp.exists():
@@ -266,22 +305,37 @@ class SdSlotTransactionService:
                 original.rename(temp)
         for entry in plan.additions:
             temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
-            if not temp.exists():
+            target = self._slot_folder(int(entry.new_slot))
+            if not temp.exists() and int(entry.new_slot) not in created_slots:
                 source_path = Path(entry.source_path)
                 temp.parent.mkdir(parents=True, exist_ok=True)
                 copy_game_source(source_path, temp)
                 self._verify_copied_source(source_path, temp)
+                validator(temp)
         for entry in plan.moves:
+            if int(entry.old_slot) in moved_slots:continue
             temp = self.temp_dir / f"{entry.old_slot:02d}"
             target = self._slot_folder(int(entry.new_slot))
-            if temp.exists() and not target.exists():
-                temp.rename(target)
+            if target.exists():raise FileExistsError(f"El slot destino ya existe: {target}")
+            if not temp.exists():raise FileNotFoundError(f"Falta el juego temporal: {temp}")
+            temp.rename(target)
+            moved.append(entry.to_dict())
+            moved_slots.add(int(entry.old_slot))
+            self._write_state("recovering_complete", created_slots=sorted(created_slots), moved=moved)
         for entry in plan.additions:
             temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
             target = self._slot_folder(int(entry.new_slot))
-            if temp.exists() and not target.exists():
+            if temp.exists():
+                if target.exists():raise FileExistsError(f"El slot destino ya existe: {target}")
                 temp.rename(target)
-        self._write_state("completed")
+                created_slots.add(int(entry.new_slot))
+                self._write_state("recovering_complete", created_slots=sorted(created_slots), moved=moved)
+            elif int(entry.new_slot) not in created_slots:
+                raise FileNotFoundError(f"Falta el juego temporal: {temp}")
+        for entry in plan.entries:
+            if entry.action!='delete' and not self._slot_folder(int(entry.new_slot)).is_dir():
+                raise FileNotFoundError(f"Falta el slot final: {entry.new_slot}")
+        self._write_state("completed", created_slots=sorted(created_slots), moved=moved)
 
     def revert_from_state(self) -> None:
         self._validate_path_containment()
@@ -291,28 +345,64 @@ class SdSlotTransactionService:
         created_slots = {
             int(value) for value in state.get("created_slots", []) if str(value).strip().isdigit()
         }
+        moved_slots = {int(entry["old_slot"]) for entry in state.get("moved", [])}
+        rollback=dict(state.get('rollback',{}))
+        removed=set(rollback.get('removed_additions',[]))
+        evacuated=set(rollback.get('evacuated_moves',[]))
+        restored=set(rollback.get('restored_moves',[]))
+        restored_deletions=set(rollback.get('restored_deletions',[]))
+        def checkpoint(stage='recovering_revert'):
+            rollback.update(removed_additions=sorted(removed),evacuated_moves=sorted(evacuated),
+                            restored_moves=sorted(restored),restored_deletions=sorted(restored_deletions))
+            self._write_state(stage,created_slots=sorted(created_slots),moved=state.get('moved',[]),rollback=rollback)
+        checkpoint()
+        for entry in plan.additions:
+            slot=int(entry.new_slot)
+            if slot in removed:continue
+            final = self._slot_folder(int(entry.new_slot))
+            if final.exists() and slot in created_slots:
+                shutil.rmtree(final)
+            removed.add(slot);checkpoint()
+        # Evacuate every owned published folder first. Restoring in reverse
+        # order alone cannot undo cycles (02 -> 03, 03 -> 02).
+        for entry in plan.moves:
+            slot=int(entry.old_slot)
+            if slot not in moved_slots or slot in evacuated or slot in restored:continue
+            temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
+            final = self._slot_folder(int(entry.new_slot))
+            if final.exists():
+                if temp.exists():raise FileExistsError(f"Ya existe temporal: {temp}")
+                temp.parent.mkdir(parents=True, exist_ok=True)
+                final.rename(temp)
+            elif not temp.exists():raise FileNotFoundError(f"Falta el juego publicado: {final}")
+            evacuated.add(slot);checkpoint()
         for entry in reversed(plan.entries):
             if entry.action == "move":
+                slot=int(entry.old_slot)
+                if slot in restored:continue
                 temp = self._path_in_root(self.temp_dir / f"{entry.old_slot:02d}", "directorio temporal")
                 original = self._slot_folder(int(entry.old_slot))
                 final = self._slot_folder(int(entry.new_slot))
-                if temp.exists() and not original.exists():
+                if temp.exists():
+                    if original.exists():raise FileExistsError(f"El slot original ya existe: {original}")
                     temp.rename(original)
-                elif final.exists() and not original.exists():
-                    final.rename(original)
+                elif not original.exists():raise FileNotFoundError(f"Falta el juego original: {original}")
+                restored.add(slot);checkpoint()
             elif entry.action == "delete":
+                slot=int(entry.old_slot)
+                if slot in restored_deletions:continue
                 trash = self._path_in_root(self.trash_dir / f"{entry.old_slot:02d}", "papelera interna")
                 original = self._slot_folder(int(entry.old_slot))
-                if trash.exists() and not original.exists():
+                if trash.exists():
+                    if original.exists():raise FileExistsError(f"El slot original ya existe: {original}")
                     trash.rename(original)
+                elif not original.exists():raise FileNotFoundError(f"Falta el juego original: {original}")
+                restored_deletions.add(slot);checkpoint()
             elif entry.action == "add":
-                final = self._slot_folder(int(entry.new_slot))
                 temp = self._path_in_root(self.add_dir / f"{entry.new_slot:02d}", "directorio temporal de altas")
-                if final.exists() and int(entry.new_slot) in created_slots:
-                    shutil.rmtree(final)
                 if temp.exists():
                     shutil.rmtree(temp)
-        self._write_state("reverted", previous_state=state.get("stage", "unknown"))
+        checkpoint('reverted')
 
     def _slot_folder(self, slot: int) -> Path:
         return self._path_in_root(self.root_path / f"{slot:02d}", "slot destino")
@@ -361,10 +451,23 @@ class SdSlotTransactionService:
 
     def _read_plan(self) -> SlotTransactionPlan:
         payload = json.loads((self.transaction_dir / "plan.json").read_text(encoding="utf-8"))
-        return SlotTransactionPlan(
+        if not isinstance(payload,dict) or payload.get('operation_id')!=self.operation_id or not isinstance(payload.get('entries'),list):
+            raise ValueError('Invalid transaction plan')
+        plan=SlotTransactionPlan(
             operation_id=str(payload["operation_id"]),
             entries=[SlotPlanEntry(**entry) for entry in payload.get("entries", [])],
         )
+        old_slots=set();new_slots=set()
+        for entry in plan.entries:
+            if entry.action not in {'add','delete','move','keep'}:raise ValueError('Invalid transaction action')
+            if type(entry.old_slot) is not int or entry.old_slot<2 or entry.old_slot in old_slots:raise ValueError('Invalid original slot')
+            old_slots.add(entry.old_slot)
+            if entry.action!='delete':
+                if type(entry.new_slot) is not int or entry.new_slot<2 or entry.new_slot in new_slots:raise ValueError('Invalid final slot')
+                new_slots.add(entry.new_slot)
+            elif entry.new_slot is not None:raise ValueError('Invalid deletion target')
+            if entry.action=='keep' and entry.old_slot!=entry.new_slot:raise ValueError('Invalid kept slot')
+        return plan
 
     def _read_state(self) -> dict[str, Any]:
         try:
@@ -373,7 +476,27 @@ class SdSlotTransactionService:
             return {}
 
     def _read_state_strict(self) -> dict[str, Any]:
-        return json.loads((self.transaction_dir / "state.json").read_text(encoding="utf-8"))
+        state=json.loads((self.transaction_dir / "state.json").read_text(encoding="utf-8"))
+        stages={'planned','deleted_to_trash','moved_to_temp','added_to_temp','publishing','moved_to_final','completed','failed','recovering_complete','recovering_revert','reverted'}
+        if not isinstance(state,dict) or state.get('operation_id')!=self.operation_id or state.get('stage') not in stages:
+            raise ValueError('Invalid transaction state')
+        plan=self._read_plan()
+        created=state.get('created_slots',[])
+        valid_created={entry.new_slot for entry in plan.additions}
+        if not isinstance(created,list) or any(type(slot) is not int or slot not in valid_created for slot in created):
+            raise ValueError('Invalid addition ownership')
+        for field,entries in (('moved',plan.moves),('added',plan.additions)):
+            records=state.get(field,[])
+            if not isinstance(records,list) or any(record not in [entry.to_dict() for entry in entries] for record in records):
+                raise ValueError('Invalid published slot evidence')
+        if any(record['new_slot'] not in created for record in state.get('added',[])):
+            raise ValueError('Missing addition ownership')
+        rollback=state.get('rollback',{})
+        if not isinstance(rollback,dict):raise ValueError('Invalid rollback progress')
+        for field,valid in (('removed_additions',valid_created),('evacuated_moves',{entry.old_slot for entry in plan.moves}),('restored_moves',{entry.old_slot for entry in plan.moves}),('restored_deletions',{entry.old_slot for entry in plan.deletions})):
+            values=rollback.get(field,[])
+            if not isinstance(values,list) or any(type(slot) is not int or slot not in valid for slot in values):raise ValueError('Invalid rollback slot evidence')
+        return state
 
     def _validate_path_containment(self) -> None:
         self._path_in_root(self.transaction_dir, "directorio de transacción")
@@ -418,6 +541,11 @@ def incomplete_slot_transactions(root_path: Path) -> list[Path]:
         except (OSError, json.JSONDecodeError):
             result.append(tx_dir)
             continue
-        if state.get("stage") not in {"completed", "reverted"}:
+        if not isinstance(state, dict) or state.get("stage") not in {"completed", "reverted"}:
             result.append(tx_dir)
     return result
+
+
+def ensure_no_incomplete_transactions(root_path: Path) -> None:
+    if incomplete_slot_transactions(root_path):
+        raise RuntimeError(tr("slot_recovery.pending"))

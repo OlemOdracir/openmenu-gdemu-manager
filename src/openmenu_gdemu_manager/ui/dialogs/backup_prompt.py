@@ -76,6 +76,9 @@ class BackupPromptDialog(QDialog):
         self.destination = suggested_backup_dir(diagnostic.root)
         self.backup_thread: QThread | None = None
         self.backup_worker: BackupWorker | None = None
+        self._backup_active = False
+        self._backup_result: str | None = None
+        self._backup_failure: str | None = None
         self.setWindowTitle(tr("dialog.backup.title"))
         self.resize(840, 500)
         self.setMinimumSize(780, 460)
@@ -169,15 +172,17 @@ class BackupPromptDialog(QDialog):
         self.backup_button = _button(tr("dialog.backup.now"), "device-floppy", "success")
         self.backup_button.clicked.connect(self.start_backup)
         buttons.addWidget(self.backup_button)
-        cancel = _button(tr("action.cancel"), "x", "default")
-        cancel.clicked.connect(self.reject)
-        buttons.addWidget(cancel)
+        self.cancel_button = _button(tr("action.cancel"), "x", "default")
+        self.cancel_button.clicked.connect(self.reject)
+        buttons.addWidget(self.cancel_button)
         layout.addLayout(buttons)
 
     def _refresh_destination(self):
         self.destination_label.setText(str(self.destination))
 
     def choose_destination(self):
+        if self._backup_active:
+            return
         folder = QFileDialog.getExistingDirectory(
             self,
             tr("dialog.backup.select_folder"),
@@ -197,6 +202,8 @@ class BackupPromptDialog(QDialog):
             )
 
     def start_backup(self):
+        if self._backup_active:
+            return
         if self.destination.exists() and any(self.destination.iterdir()):
             if not _confirm_message(
                 self,
@@ -209,6 +216,7 @@ class BackupPromptDialog(QDialog):
         ):
             return
         self._set_busy(True, tr("dialog.backup.preparing"))
+        self._backup_active = True
         self.backup_worker = BackupWorker(self.diagnostic.root, self.destination)
         self.backup_thread = QThread(self)
         self.backup_worker.moveToThread(self.backup_thread)
@@ -219,6 +227,7 @@ class BackupPromptDialog(QDialog):
         self.backup_worker.finished.connect(self.backup_thread.quit)
         self.backup_worker.error.connect(self.backup_thread.quit)
         self.backup_thread.finished.connect(self.backup_worker.deleteLater)
+        self.backup_thread.finished.connect(self._backup_stopped)
         self.backup_thread.finished.connect(self.backup_thread.deleteLater)
         self.backup_thread.start()
 
@@ -228,18 +237,43 @@ class BackupPromptDialog(QDialog):
         self.status.setText(tr("dialog.backup.progress", current=current, total=total, file=file_name))
 
     def backup_finished(self, destination: str):
-        self._set_busy(False, tr("dialog.backup.done", path=destination))
+        self.status.setText(tr("dialog.backup.done", path=destination))
         self.settings = set_backup_decision(self.settings, self.diagnostic, "backed_up", Path(destination))
         write_backup_registry(self.diagnostic.root, Path(destination))
         save_settings(self.settings)
-        QMessageBox.information(self, APP_NAME, tr("dialog.backup.done_detail", path=destination))
-        self.accept()
+        self._backup_result = destination
 
     def backup_error(self, message: str):
-        self._set_busy(False, "")
-        QMessageBox.warning(self, APP_NAME, tr("dialog.backup.failed", message=message))
+        self._backup_failure = message
+
+    def _backup_stopped(self):
+        self._backup_active = False
+        self.backup_thread = None
+        self.backup_worker = None
+        self._set_busy(False, self.status.text())
+        if self._backup_result is not None:
+            destination = self._backup_result
+            self._backup_result = None
+            QMessageBox.information(self, APP_NAME, tr("dialog.backup.done_detail", path=destination))
+            self.accept()
+        elif self._backup_failure is not None:
+            failure = self._backup_failure
+            self._backup_failure = None
+            QMessageBox.warning(self, APP_NAME, tr("dialog.backup.failed", message=failure))
+
+    def reject(self):
+        if not self._backup_active:
+            super().reject()
+
+    def closeEvent(self, event):
+        if self._backup_active:
+            event.ignore()
+        else:
+            super().closeEvent(event)
 
     def skip_backup(self):
+        if self._backup_active:
+            return
         if not _confirm_message(
             self,
             tr("dialog.backup.skip_confirm"),
@@ -256,6 +290,7 @@ class BackupPromptDialog(QDialog):
             self.progress.setRange(0, 0)
         self.status.setText(message)
         self.choose_button.setEnabled(not busy)
+        self.cancel_button.setEnabled(not busy)
         if self.skip_button is not None:
             self.skip_button.setEnabled(not busy)
         self.backup_button.setEnabled(not busy)

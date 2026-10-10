@@ -45,6 +45,9 @@ TABLER_ACTION_ICONS = {
 
 
 def action_qicon(action_name: str, variant: str = "default", size: int = 24) -> QIcon:
+    shared = _v2_icon(TABLER_ACTION_ICONS.get(action_name, 'info-circle'), variant, size)
+    if shared is not None:
+        return shared
     palette = template_palette()
     color = _variant_color(palette, variant)
     tabler_icon = TABLER_ACTION_ICONS.get(action_name)
@@ -55,6 +58,9 @@ def action_qicon(action_name: str, variant: str = "default", size: int = 24) -> 
 
 
 def vendor_qicon(pack: str, icon_name: str, variant: str = "default", size: int = 24) -> QIcon:
+    shared = _v2_icon(icon_name, variant, size) if pack == 'tabler' else None
+    if shared is not None:
+        return shared
     palette = template_palette()
     color = _variant_color(palette, variant)
     return vendor_svg_icon(pack, icon_name, color, size)
@@ -81,14 +87,30 @@ def app_logo_pixmap(size: int) -> QPixmap:
     return pixmap.scaled(QSize(size, size), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
 
-@lru_cache(maxsize=16)
 def sd_card_qicon(size: int = 24) -> QIcon:
+    shared = _v2_icon('device-sd-card', 'default', size)
+    if shared is not None:
+        return shared
     path = files("openmenu_gdemu_manager.resources.illustrations").joinpath("sd_card_dark_128.png")
     pixmap = QPixmap(str(path))
     if pixmap.isNull():
         return action_qicon("browse", "default", size)
     pixmap = pixmap.scaled(QSize(size, size), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     return _stable_icon(pixmap)
+
+
+def _v2_icon(name: str, variant: str, size: int) -> QIcon | None:
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is None or not app.property('v2Design'):
+        return None
+    from .v2 import design, catalog
+    # Deliberate equivalents in the shared family; never a warning fallback.
+    name = {'arrows-shuffle': 'hierarchy', 'id': 'file'}.get(name, name)
+    if not (catalog.REFERENCE / 'icons' / f'{name}.svg').is_file():
+        return None
+    color = design.colors().get({'default': 'ink', 'accent': 'accent'}.get(variant, variant), design.colors()['ink'])
+    return design.icon(name, color, size)
 
 
 @lru_cache(maxsize=64)

@@ -12,6 +12,14 @@ La app permite revisar una estructura GDEMU/OpenMenu, agregar o quitar juegos, c
 
 ## Estado
 
+La rama de desarrollo incorpora **OpenMenu v2 (`2.0.0.dev1`)**: interfaz nativa
+con el flujo aprobado de colección, búsqueda, ampliación y comparación de
+carátulas, conectada a los servicios originales. Consulta el
+[alcance y las funciones conservadas](docs/OPENMENU_V2.md) y la
+[validación generada](docs/V2_VALIDATION.md). Esta v2 todavía requiere pruebas
+de lanzamiento de juegos en hardware; los resultados de la beta anterior no la
+certifican. La interfaz anterior sigue disponible con `--legacy-ui`.
+
 Beta publica. El flujo principal de SD ya fue probado en hardware real Dreamcast/GDEMU, incluyendo operaciones grandes de agregar, eliminar y actualizar caratulas. Aun asi, usala con respaldos y revisa siempre el diagnostico antes de aplicar cambios en una SD.
 
 Este repositorio no incluye ROMs, BIOS, datos comerciales de juegos, respaldos de SD, assets oficiales de Sega ni credenciales privadas de APIs.

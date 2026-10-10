@@ -41,6 +41,11 @@ class SpinnerLabel(QWidget):
 
     def paintEvent(self, _event):
         palette = template_palette()
+        app = QApplication.instance()
+        if app and app.property('v2Design'):
+            from ..v2.design import colors
+            c = colors()
+            palette = {**palette, 'accent': c['accent'], 'accent_soft': c['accent_soft'], 'surface': c['paper'], 'surface_alt': c['soft'], 'border': c['line'], 'muted': c['muted']}
         side = min(self.width(), self.height()) - 4
         rect_x = (self.width() - side) / 2
         rect_y = (self.height() - side) / 2
@@ -123,7 +128,11 @@ class BusyOverlay(QWidget):
             return
         self.setGeometry(self.parentWidget().rect())
         width = min(430, max(320, self.width() - 60))
-        self.panel.resize(width, 156)
+        height = 156
+        if QApplication.instance().property('v2Design'):
+            self.panel.layout().activate()
+            height = max(height, self.panel.layout().totalHeightForWidth(width))
+        self.panel.resize(width, height)
         self.panel.move((self.width() - self.panel.width()) // 2, max(24, (self.height() - self.panel.height()) // 2))
 
     def show_message(self, title: str, detail: str = ""):

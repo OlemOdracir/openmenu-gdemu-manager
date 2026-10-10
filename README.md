@@ -4,6 +4,12 @@
 
 # OpenMenu GDEMU Manager (OGM)
 
+Development now includes **v2 (`2.0.0.dev1`)**, the native collection/cover
+workspace over the original services. See [scope and retained functionality](docs/OPENMENU_V2.md)
+and [generated validation](docs/V2_VALIDATION.md). V2 hardware game launch
+validation is pending; v1 hardware results do not certify this build. The
+previous UI remains available with `--legacy-ui`.
+
 [Español](README.es.md)
 
 Portable Windows desktop app for preparing and managing Dreamcast GDEMU/OpenMenu SD cards and local backups.
