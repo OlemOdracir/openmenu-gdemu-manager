@@ -184,3 +184,26 @@ and delivery**, with no reproducible blocker in the audited scope. The reviewer
 independently checked generated XML counts/digest, archive correspondence and a
 fresh installed-CLI call on a synthetic CDI without runtime/document migration.
 This closes the local integration conditions, not the remaining release gates.
+
+## dev6 logging correction audit (2026-10-10)
+
+An independent reviewer without conversation context reviewed the logging diff
+against develop. Its initial Windows reproduction found that two application
+instances sharing a rotating file could discard new records at rollover. This
+blocked integration until corrected with unique session files and OS lease locks
+that protect live sessions from history cleanup.
+
+The reviewer approved the final inspected diff within synthetic local scope:
+29 logging/CLI regressions passed. Its independent two-live-process Windows
+probe retained final records in both sessions, protected them during cleanup and
+removed retired logs/backups/leases after shutdown. Constructor failure and
+repeated close released leases. Credential probes covered URL query passwords,
+bearer, JSON/client_secret and escaped quotes. It also ran 62 related save,
+transaction/recovery, launcher and V2 workflow tests during review and observed
+no unsafe reordering of the storage workflow or new headless writes.
+
+The final full/DPI harness result is generated separately in
+[V2_VALIDATION.md](V2_VALIDATION.md); final portable evidence is in
+[V2_PORTABLE_VALIDATION.md](V2_PORTABLE_VALIDATION.md). This review is not approval
+of physical SD/Dreamcast operation, a clean Windows installation, all native
+crashes or complete anonymization of user data. No MCP server is added.

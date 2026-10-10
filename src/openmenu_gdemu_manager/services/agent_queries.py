@@ -3,12 +3,15 @@
 No GUI, settings migration, network provider or write transaction is started.
 The caller selects an explicit destination; no drive enumeration is performed.
 """
+import logging
 from dataclasses import asdict
 from pathlib import Path
 
 from ..dreamcast.cdi import CDIError, inspect_cdi
 from ..dreamcast.image_integrity import ImageIntegrityError, validate_source
 from ..dreamcast.storage_diagnostics import diagnose_storage
+
+log = logging.getLogger("openmenu_gdemu_manager.agent.queries")
 
 SCHEMA_VERSION = 1
 EXIT_CODES = {'checked': 0, 'invalid': 2, 'unsupported': 3, 'unreadable': 4}
@@ -32,11 +35,13 @@ def validate_image(path):
         result.update(status=exc.category, issues=[{'category': exc.category, 'code': exc.code, 'message': str(exc)}])
     except ImageIntegrityError as exc:
         if isinstance(exc.__cause__, OSError):
+            log.warning("Image access failed: path=%s", path, exc_info=True)
             from ..i18n import tr
             result.update(status='unreadable', issues=[{'category': 'unreadable', 'code': 'source_unreadable', 'message': tr('agent.source_unreadable')}])
         else:
             result.update(status='invalid', issues=[{'category': 'invalid', 'code': 'image_structure', 'message': str(exc)}])
-    except (OSError, ValueError, RuntimeError):
+    except Exception:
+        log.exception("Image validation failed: path=%s", path)
         from ..i18n import tr
         result.update(status='unreadable', issues=[{'category': 'unreadable', 'code': 'source_unreadable', 'message': tr('agent.source_unreadable')}])
     return result

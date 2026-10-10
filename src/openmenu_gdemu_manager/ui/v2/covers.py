@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+from ...app.logger import logged_operation
 from math import ceil
 from pathlib import Path
 from urllib.parse import urlencode
@@ -8,6 +10,8 @@ from urllib.parse import urlencode
 from PySide6.QtCore import Qt, QTimer, QSize, QPointF, Signal, QUrl
 from PySide6.QtGui import QPixmap, QDesktopServices, QPainter, QColor
 from PySide6.QtWidgets import QApplication, QDialog, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLineEdit, QStackedWidget, QSizePolicy, QGraphicsView, QGraphicsScene, QComboBox, QMenu, QLayout
+
+log = logging.getLogger(__name__)
 
 from . import catalog
 from .catalog import tr, variant
@@ -629,6 +633,7 @@ class CoverWorkspace(QDialog):
         paths,_=QFileDialog.getOpenFileNames(self,tr('local_source'),'',tr('images_filter'))
         self.import_paths(paths)
 
+    @logged_operation("import_local_covers")
     def import_paths(self, paths):
         added,failed,available=0,0,0
         for raw in paths:
@@ -655,6 +660,7 @@ class CoverWorkspace(QDialog):
                 self.cache[key]=pm
                 added+=1
             except (OSError,ValueError):
+                log.warning("Local cover rejected: path=%s", path, exc_info=True)
                 failed+=1
         self.session.page=max(1,ceil(len(self.store.candidates(self.game))/6))
         self.results()
