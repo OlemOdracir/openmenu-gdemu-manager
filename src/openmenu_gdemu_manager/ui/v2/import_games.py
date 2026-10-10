@@ -1,5 +1,7 @@
 """Real file/folder inspection with explicit, reversible import selection."""
+import logging
 from pathlib import Path
+from ...app.logger import logged_operation
 from PySide6.QtCore import Qt,Signal,QObject,Slot
 from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QFileDialog,QTableWidget,QTableWidgetItem,QHeaderView,QMessageBox
 from ...core.models import RomLibraryEntry
@@ -11,9 +13,13 @@ from .design import Button,SelectionCheck,label
 from .catalog import tr
 
 
+log = logging.getLogger(__name__)
+
+
 class InspectWorker(QObject):
     finished=Signal(object);error=Signal(str)
     def __init__(self,paths,supported):super().__init__();self.paths=paths;self.supported=supported
+    @logged_operation("inspect_games")
     def run(self):
         try:
             results={}
@@ -27,13 +33,18 @@ class InspectWorker(QObject):
                         if entry is None:continue
                         reason=''
                         try:validate_source(entry.source_path)
-                        except ValueError as exc:reason=str(exc)
+                        except ValueError as exc:
+                            log.warning("Source rejected: path=%s reason=%s", entry.source_path, exc)
+                            reason=str(exc)
                         results.setdefault(entry.source_path.casefold(),(entry,reason))
                     except (OSError,ValueError) as exc:
+                        log.warning("Source inspection failed: path=%s", source, exc_info=True)
                         entry=RomLibraryEntry(name=source.parent.name,media_type=source.suffix[1:].upper(),source_path=str(source))
                         results.setdefault(str(source).casefold(),(entry,str(exc)))
             self.finished.emit(list(results.values()))
-        except Exception as exc:self.error.emit(str(exc))
+        except Exception as exc:
+            log.exception("Source inspection failed")
+            self.error.emit(str(exc))
 
 
 class ImportGamesDialog(QDialog):

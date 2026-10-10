@@ -30,6 +30,7 @@ from ..services.openmenu_rebuilder import OpenMenuRebuilder
 from ..services.search_log import append_search_event_for_game, summarize_candidates
 from ..services.sd_slot_transaction import SdSlotTransactionService, ensure_no_incomplete_transactions
 from ..services.transaction_log import append_transaction, new_operation_id
+from ..app.logger import operation_context
 
 log = logging.getLogger(__name__)
 GITHUB_RELEASES_API = "https://api.github.com/repos/OlemOdracir/openmenu-gdemu-manager/releases"
@@ -569,6 +570,11 @@ class SaveChangesWorker(QObject):
 
     def run(self):
         operation_id = new_operation_id()
+        with operation_context("save_changes", operation_id):
+            self._run_with_logging(operation_id)
+
+    def _run_with_logging(self, operation_id):
+        log.info("SaveChangesWorker started: root=%s games=%s", self.root_path, len(self.games))
         transaction_summary: dict | None = None
         preflight_completed = False
         try:
@@ -685,6 +691,7 @@ class SaveChangesWorker(QObject):
             except Exception as log_exc:
                 log.exception("Could not write success transaction")
                 log_error = log_exc
+            log.info("SaveChangesWorker completed: root=%s menu_items=%s journal=%s", self.root_path, rebuild_result.num_items, log_path)
             self.finished.emit(
                 _save_success_message(
                     additions=len(additions),

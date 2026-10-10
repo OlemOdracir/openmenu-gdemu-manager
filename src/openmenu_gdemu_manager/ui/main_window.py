@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import APP_NAME, REPOSITORY_URL
+from ..app.logger import active_log_path
 from .dialogs import (
     AboutDialog, AddGameDialog, BackupPromptDialog, BulkProgressDialog, CandidateDialog, ConfirmApplyDialog,
     CoverPreviewDialog, LanguageSelectionDialog, LegacyMenuUpgradeDialog, ProviderSettingsDialog, SetupWizardDialog,
@@ -40,7 +41,7 @@ from .dialogs.setup_wizard import _has_user_backup_content
 from ..core.image_quality import NORMALIZATION_MODE, analyze_image, apply_quality_report
 from ..core.models import BulkProposal, Candidate, GameItem, RomLibraryEntry, VALID_STATES
 from ..config.paths import (
-    BASE_DIR, INBOX_DIR, LOG_PATH, REPORT_JSON, REPORT_TSV, STATE_PATH, migrate_legacy_runtime_data,
+    BASE_DIR, INBOX_DIR, REPORT_JSON, REPORT_TSV, STATE_PATH, migrate_legacy_runtime_data,
 )
 from ..i18n import (
     active_language, available_languages, refresh_languages, set_language, tr, translate_status,
@@ -368,7 +369,7 @@ class MainWindow(QMainWindow):
         open_cache.triggered.connect(lambda: self.safe_call(lambda: self.open_path(STATE_PATH.parent)))
         self.file_menu.addAction(open_cache)
         open_log = QAction(action_qicon("log"), tr("menu.open_log"), self)
-        open_log.triggered.connect(lambda: self.safe_call(lambda: self.open_path(LOG_PATH)))
+        open_log.triggered.connect(lambda: self.safe_call(lambda: self.open_path(active_log_path())))
         self.file_menu.addAction(open_log)
         self.file_menu.addSeparator()
         export_report_action = QAction(action_qicon("report"), tr("menu.export_report"), self)
@@ -579,7 +580,7 @@ class MainWindow(QMainWindow):
         open_cache.triggered.connect(lambda: self.safe_call(lambda: self.open_path(STATE_PATH.parent)))
         self.file_menu.addAction(open_cache)
         open_log = QAction(action_qicon("log"), tr("menu.open_log"), self)
-        open_log.triggered.connect(lambda: self.safe_call(lambda: self.open_path(LOG_PATH)))
+        open_log.triggered.connect(lambda: self.safe_call(lambda: self.open_path(active_log_path())))
         self.file_menu.addAction(open_log)
         self.file_menu.addSeparator()
         export_report_action = QAction(action_qicon("report"), tr("menu.export_report"), self)

@@ -1,5 +1,7 @@
 """Connect approved cover workspace to original search/persistence services."""
+import logging
 from pathlib import Path
+from ...app.logger import logged_operation
 from PIL import Image
 from PySide6.QtCore import QObject,Signal,QTimer,Qt,Slot,QUrl
 from PySide6.QtGui import QPixmap,QDesktopServices
@@ -20,6 +22,9 @@ from .covers import CoverWorkspace
 from .state import CoverStore
 
 
+log = logging.getLogger(__name__)
+
+
 class CoverSearchWorker(QObject):
     finished=Signal(object)
     error=Signal(str)
@@ -31,12 +36,15 @@ class CoverSearchWorker(QObject):
 
     def cancel(self):self.cancelled=True
 
+    @logged_operation("search_covers")
     def run(self):
+        log.info("Cover search started: game=%s query=%s", getattr(self.game,"name",""), self.query)
         worker=SearchWorker(self.game,self.query,write_allowed=self.write_allowed)
         worker.finished.connect(self.prepare)
         worker.error.connect(self.error.emit)
         worker.run()
 
+    @logged_operation("prepare_cover_images")
     def prepare(self, payload):
         prepared=[]
         for candidate in payload.get('candidates',[]):
@@ -47,7 +55,10 @@ class CoverSearchWorker(QObject):
                 candidate.width,candidate.height=image.size
                 candidate.quality_label,candidate.quality_score=report.label,report.score
                 prepared.append((candidate,image,''))
-            except Exception as exc:prepared.append((candidate,None,str(exc)))
+            except Exception as exc:
+                log.exception("Cover preparation failed: game=%s query=%s provider=%s image=%s",
+                              getattr(self.game,"name",""), self.query, candidate.source, candidate.local_path or candidate.url)
+                prepared.append((candidate,None,str(exc)))
         self.finished.emit({'items':prepared,'query':self.query,'cancelled':self.cancelled})
 
 
@@ -284,6 +295,9 @@ class ProductionWorkspace(CoverWorkspace):
 class RetryImageWorker(QObject):
     finished=Signal(object);error=Signal(str)
     def __init__(self,candidate):super().__init__();self.candidate=candidate
+    @logged_operation("retry_cover_image")
     def run(self):
         try:self.finished.emit((self.candidate,load_candidate_image(self.candidate)))
-        except Exception as exc:self.error.emit(str(exc))
+        except Exception as exc:
+            log.exception("Cover retry failed: provider=%s image=%s", self.candidate.source, self.candidate.local_path or self.candidate.url)
+            self.error.emit(str(exc))

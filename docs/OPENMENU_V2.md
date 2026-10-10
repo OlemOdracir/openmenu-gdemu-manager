@@ -116,7 +116,7 @@ python -m openmenu_gdemu_manager
 python -m openmenu_gdemu_manager --legacy-ui
 python scripts/validate_v2.py
 python scripts/validate_v2.py --check-docs
-./scripts/build_portable.ps1 -Version "2.0.0-dev5"
+./scripts/build_portable.ps1 -Version "2.0.0-dev6"
 ./dist/OpenMenuGDEMUManager-Portable/OpenMenuGDEMUManager.exe --self-test report.json
 ```
 
@@ -129,8 +129,8 @@ The self-test verifies native startup and packaged icons without SD/network work
 Generated artifacts, caches, ROMs, real library inventories and mockup sample
 covers must not be committed. No new third-party dependency was introduced.
 
-Keep this work on the feature branch until review, then merge to develop. Main
-receives only a validated release. Every commit uses Conventional Commits and
+Use a reviewed topic branch from develop for corrections, then integrate its PR
+into develop. Main receives only a validated release. Every commit uses Conventional Commits and
 the repository's existing commit-msg/pre-push hooks.
 
 ## Remaining release checks
@@ -159,3 +159,44 @@ automatic drive discovery. It does not authorize or execute writes.
 using the official SDK. No MCP server or remote API is activated in this phase.
 The source installation provides the CLI entry point; the GUI portable does not
 include a separate console executable.
+
+## Error diagnostics (dev6)
+
+The native application initializes diagnostics before runtime migration and Qt/UI
+imports. Startup/DLL failures, uncaught Python and worker-thread exceptions and Qt
+warnings/errors can therefore be retained when the logger itself can initialize.
+V2 game inspection, local cover imports, image preparation and retries log their
+originating errors without changing the existing user-facing workflows. Saves use
+the same operation ID in the application log and transaction recovery journal.
+
+The application log records UTC time, module, level, session/operation IDs and
+thread, plus app/Python/platform and loaded Qt versions at startup. Each session
+uses a separate
+`openmenu_gdemu_manager.<session-id>.log` file, rotating at a 2 MiB threshold
+with four backups. Five recent sessions are retained, plus any older still-active
+sessions protected by OS file leases; transaction/search/recovery files on
+storage are not rotated or changed by this policy. The normal log is under the
+runtime data folder (portable: `data/openmenu_gdemu_manager.<session-id>.log`). If
+it is not writable, a temporary `OpenMenu GDEMU Manager` folder is tried and the existing
+Open log action opens the active path. Failure of both locations or a native
+crash before Python starts remains outside this guarantee.
+
+Known URL password/token/API-key fields, URL userinfo and bearer/basic headers
+are masked in formatted diagnostics. This is not complete anonymization: paths,
+game names, hosts and other user data can remain. Review logs before sharing;
+do not commit them to this public repository. Independent application processes
+rotate separate files; history cleanup skips
+active sessions. These are application diagnostics, not a cross-process collector.
+
+The headless CLI returns a `request_id` in its existing schema-versioned JSON and
+retains error tracebacks on stderr with the matching ID. It creates no diagnostic
+file, imports no Qt and does not migrate runtime data or mutate the inspected
+source/destination. Normal invalid/unsupported image findings remain categorized
+JSON results; unexpected/access failures also retain a technical diagnostic.
+This prepares diagnostics for agent use; no MCP server is activated.
+
+Regression coverage is in `tests/test_logging_diagnostics.py`; generated full/DPI
+evidence remains in [V2 validation](V2_VALIDATION.md). The old dev5 portable does
+not include these changes. The dev6 local packaging/startup checks passed; see
+[V2 portable evidence](V2_PORTABLE_VALIDATION.md). Existing clean-Windows/hardware
+gates still apply.

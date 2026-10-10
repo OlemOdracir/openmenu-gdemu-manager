@@ -1,10 +1,12 @@
 """Headless, read-only JSON commands. This module is not an MCP transport."""
 import argparse
 import json
+import logging
 import sys
 
 from .services.agent_queries import EXIT_CODES, validate_image, diagnose_destination
 from .i18n import set_language, tr
+from .app.logger import agent_logging, operation_context
 
 
 def main(argv=None):
@@ -23,18 +25,21 @@ def main(argv=None):
         child.add_argument('path', help=tr('agent.cli.path'))
     args = parser.parse_args(argv)
     set_language(args.language)
-    try:
-        if args.command == 'validate-image':
-            result = validate_image(args.path)
-            code = EXIT_CODES[result['status']]
-        else:
-            result = diagnose_destination(args.path)
-            code = 0
-    except (OSError, ValueError, RuntimeError):
-        result = {'schema_version': 1, 'operation': 'validate_image' if args.command == 'validate-image' else 'diagnose_destination',
-                  'path': args.path, 'read_only': True, 'hardware_verified': False,
-                  'status': 'unreadable', 'issues': [{'category': 'unreadable', 'code': 'source_unreadable', 'message': tr('agent.source_unreadable')}]}
-        code = 4
+    with agent_logging() as request_id, operation_context(args.command, request_id):
+        try:
+            if args.command == 'validate-image':
+                result = validate_image(args.path)
+                code = EXIT_CODES[result['status']]
+            else:
+                result = diagnose_destination(args.path)
+                code = 0
+        except Exception:
+            logging.getLogger("openmenu_gdemu_manager.agent.cli").exception("Agent command failed: command=%s path=%s", args.command, args.path)
+            result = {'schema_version': 1, 'operation': 'validate_image' if args.command == 'validate-image' else 'diagnose_destination',
+                      'path': args.path, 'read_only': True, 'hardware_verified': False,
+                      'status': 'unreadable', 'issues': [{'category': 'unreadable', 'code': 'source_unreadable', 'message': tr('agent.source_unreadable')}]}
+            code = 4
+    result["request_id"] = request_id
     print(json.dumps(result, ensure_ascii=True, default=str))
     return code
 
